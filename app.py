@@ -278,7 +278,7 @@ def submit_ticket():
         subject=subject,
         description=description,
         predicted_category=predicted_category,
-        top_n=5,
+        top_n=100,  # Retrieve more tickets to find all above 60%
         verbose=False
     )
     
@@ -329,6 +329,10 @@ def submit_ticket():
     
     # Count how many tickets meet auto-reply threshold (60%+ weighted similarity)
     auto_reply_candidate_count = sum(1 for t in similar_tickets if t.get('weighted_score', 0) >= AUTO_REPLY_THRESHOLD)
+    
+    # Filter tickets above 60% and calculate average
+    tickets_above_60 = [t for t in similar_tickets if t.get('weighted_score', 0) >= AUTO_REPLY_THRESHOLD]
+    average_similarity_above_60 = (sum(t.get('weighted_score', 0) for t in tickets_above_60) / len(tickets_above_60)) if tickets_above_60 else 0.0
     
     # Auto-reply only if 10 or more similar tickets exist
     if auto_reply_candidate_count >= 10 and len(similar_tickets) > 0:
@@ -796,8 +800,10 @@ def submit_ticket():
         'is_duplicate': is_duplicate,
         'duplicate_status': 'Duplicate Ticket' if is_duplicate else 'New Ticket',
         'highest_similarity': f"{highest_similarity*100:.2f}%",
-        'similar_tickets': similar_tickets[:3],  # Top 3 for display
+        'similar_tickets': similar_tickets[:3],  # Top 3 for quick view
+        'tickets_above_60': tickets_above_60,  # ALL tickets above 60% threshold
         'similar_ticket_count_60_plus': auto_reply_candidate_count,  # Count of tickets with 60%+ similarity
+        'average_similarity_60_plus': f"{average_similarity_above_60*100:.2f}%" if average_similarity_above_60 > 0 else 'N/A',
         
         # Auto-Reply Feature
         'auto_reply': auto_reply_message,

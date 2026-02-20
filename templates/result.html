@@ -438,7 +438,30 @@
                         <div class="info-value">Category-weighted cosine similarity</div>
                     </div>
                     
-                    {% if result.similar_tickets %}
+                    {% if result.tickets_above_60 %}
+                    <div class="info-row">
+                        <div class="info-label">All Tickets Above 60%:</div>
+                        <div class="info-value">
+                            <div style="max-height: 500px; overflow-y: auto; padding-right: 10px;">
+                            {% for ticket in result.tickets_above_60 %}
+                            <div class="similar-ticket" style="margin-bottom: 15px; border-left: 3px solid {{ '#4caf50' if ticket.weighted_score >= 0.80 else '#2196F3' if ticket.weighted_score >= 0.70 else '#ff9800' }}; padding-left: 10px;">
+                                <h4>Ticket #{{ ticket.ticket_id or 'N/A' }} - {{ ticket.category }}</h4>
+                                <p><strong>Subject:</strong> {{ ticket.subject or 'N/A' }}</p>
+                                <p><strong>Similarity:</strong> <span style="font-weight: bold; color: {{ '#4caf50' if ticket.weighted_score >= 0.80 else '#2196F3' if ticket.weighted_score >= 0.70 else '#ff9800' }};">{{ (ticket.weighted_score * 100)|round(2) }}%</span> (weighted)</p>
+                                <p><strong>Raw Similarity:</strong> {{ (ticket.raw_similarity * 100)|round(2) }}%</p>
+                                {% if ticket.weighted_score >= 0.80 %}
+                                <p style="color: #4caf50; font-weight: bold;">🔴 Very High Match (80%+)</p>
+                                {% elif ticket.weighted_score >= 0.70 %}
+                                <p style="color: #2196F3; font-weight: bold;">🟡 High Match (70-79%)</p>
+                                {% else %}
+                                <p style="color: #ff9800; font-weight: bold;">🟢 Medium Match (60-69%)</p>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% elif result.similar_tickets %}
                     <div class="info-row">
                         <div class="info-label">Top Similar Tickets:</div>
                         <div class="info-value">
