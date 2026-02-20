@@ -18,51 +18,46 @@ The CLI demo uses this same logic to ensure consistency.
 
 
 def build_semantic_text(
-    context: str,
     subject: str,
     description: str,
+    context: str = None,
     context_details: dict = None
 ) -> str:
     """
     Build semantic text from structured ticket inputs.
     
     This is the ONLY text that Model 1 will see. It combines:
-    - Issue context (category)
-    - Context-specific details (app name, device type, etc.)
     - Subject (short summary)
     - Description (detailed explanation)
+    - [Optional] Issue context (category) - for backward compatibility
+    - [Optional] Context-specific details - for backward compatibility
     
     Args:
-        context: Issue context (e.g., "Software / Application", "Hardware / Device")
         subject: Short subject line (e.g., "Laptop overheating during builds")
         description: Detailed description of the issue
+        context: Optional issue context (e.g., "Software / Application")
         context_details: Optional dict with context-specific fields
-                        e.g., {"application": "VS Code", "device_type": "Laptop"}
     
     Returns:
         Semantic text string optimized for Model 1 embedding generation
     
     Example:
         Input:
-            context = "Hardware / Device"
             subject = "Docking station not detecting monitor"
             description = "External display not showing up when connected"
-            context_details = {"device_type": "Docking Station"}
         
         Output:
-            [Context: Hardware / Device]
-            [Device: Docking Station]
             Docking station not detecting monitor.
             External display not showing up when connected.
     """
     # Initialize text blocks
     text_parts = []
     
-    # Add context tag (helps Model 1 understand domain)
+    # Add context tag only if provided (backward compatibility)
     if context:
         text_parts.append(f"[Context: {context}]")
     
-    # Add context-specific details
+    # Add context-specific details only if provided (backward compatibility)
     if context_details:
         # Map common field names to readable labels
         field_labels = {
@@ -79,8 +74,7 @@ def build_semantic_text(
                 label = field_labels.get(field_key, field_key.replace("_", " ").title())
                 text_parts.append(f"[{label}: {field_value}]")
     
-    # Add subject and description
-    # These are the core semantic signals Model 1 will use
+    # Add subject and description (core content)
     if subject:
         text_parts.append(subject)
     

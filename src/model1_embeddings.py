@@ -31,7 +31,7 @@ class TicketEmbeddingGenerator:
     def __init__(self, model_name='all-MiniLM-L6-v2'):
         """
         Initialize the embedding generator.
-        
+            
         Args:
             model_name: Name of the sentence-transformer model to use
         """

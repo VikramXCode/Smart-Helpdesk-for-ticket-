@@ -288,37 +288,7 @@
                 </div>
             </div>
             
-            <div class="warning-box">
-                <strong>⚠️ Important:</strong>
-                <p>The category you select below is ONLY for UI context. The AI will independently classify your ticket based on semantic analysis.</p>
-            </div>
-            
             <form action="/submit-ticket" method="POST" onsubmit="return validateForm()">
-                <!-- Issue Context -->
-                <div class="form-group">
-                    <label for="context">Issue Context <span class="required">*</span></label>
-                    <select name="context" id="context" required onchange="updateSubtypeOptions()">
-                        <option value="">-- Select Issue Type --</option>
-                        <option value="Software / Application">Software / Application</option>
-                        <option value="Hardware / Device">Hardware / Device</option>
-                        <option value="Network / VPN">Network / VPN</option>
-                        <option value="Access / Permission">Access / Permission</option>
-                        <option value="Facilities">Facilities</option>
-                        <option value="Environment">Environment</option>
-                        <option value="Other">Other</option>
-                    </select>
-                    <div class="info-text">This helps provide context but does NOT override AI classification</div>
-                </div>
-                
-                <!-- Conditional Subtype -->
-                <div class="form-group" id="subtype-group" style="display: none;">
-                    <label for="subtype" id="subtype-label">Subtype</label>
-                    <select name="subtype" id="subtype-select" style="display: none;">
-                        <option value="">-- Select --</option>
-                    </select>
-                    <input type="text" name="subtype" id="subtype-text" placeholder="Please specify" style="display: none;">
-                </div>
-                
                 <!-- Subject -->
                 <div class="form-group">
                     <label for="subject">Subject <span class="required">*</span></label>
@@ -351,59 +321,6 @@
     </div>
     
     <script>
-        function updateSubtypeOptions() {
-            const context = document.getElementById('context').value;
-            const subtypeGroup = document.getElementById('subtype-group');
-            const subtypeSelect = document.getElementById('subtype-select');
-            const subtypeText = document.getElementById('subtype-text');
-            const subtypeLabel = document.getElementById('subtype-label');
-            
-            // Reset
-            subtypeSelect.style.display = 'none';
-            subtypeText.style.display = 'none';
-            subtypeSelect.innerHTML = '<option value="">-- Select --</option>';
-            
-            if (context === 'Hardware / Device') {
-                subtypeLabel.textContent = 'Device Type';
-                const options = ['Laptop', 'Desktop', 'Keyboard', 'Mouse', 'Monitor', 'Docking Station', 'Other'];
-                options.forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt;
-                    subtypeSelect.appendChild(option);
-                });
-                subtypeSelect.style.display = 'block';
-                subtypeGroup.style.display = 'block';
-            } 
-            else if (context === 'Software / Application') {
-                subtypeLabel.textContent = 'Application Name';
-                subtypeText.placeholder = 'Enter application name (e.g., Outlook, Chrome, Slack)';
-                subtypeText.style.display = 'block';
-                subtypeGroup.style.display = 'block';
-            }
-            else if (context === 'Network / VPN') {
-                subtypeLabel.textContent = 'Network Type';
-                const options = ['VPN', 'WiFi', 'LAN', 'DNS', 'Other'];
-                options.forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt;
-                    subtypeSelect.appendChild(option);
-                });
-                subtypeSelect.style.display = 'block';
-                subtypeGroup.style.display = 'block';
-            }
-            else if (context === 'Other') {
-                subtypeLabel.textContent = 'Specify Type';
-                subtypeText.placeholder = 'Please specify the type of issue';
-                subtypeText.style.display = 'block';
-                subtypeGroup.style.display = 'block';
-            }
-            else {
-                subtypeGroup.style.display = 'none';
-            }
-        }
-        
         function validateForm() {
             const subject = document.getElementById('subject').value;
             const description = document.getElementById('description').value;
@@ -430,7 +347,6 @@
         
         function saveFormData() {
             const formData = {
-                context: document.getElementById('context').value,
                 subject: document.getElementById('subject').value,
                 description: document.getElementById('description').value,
                 timestamp: new Date().toLocaleString()
@@ -459,12 +375,8 @@
             const ticket = savedTickets[selectedIndex];
             
             if (ticket) {
-                document.getElementById('context').value = ticket.context;
                 document.getElementById('subject').value = ticket.subject;
                 document.getElementById('description').value = ticket.description;
-                
-                // Trigger context change to update subtype
-                updateSubtypeOptions();
                 
                 // Scroll to form
                 document.getElementById('subject').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -502,38 +414,26 @@
         function loadTestTicket(type) {
             const testTickets = {
                 'vpn': {
-                    context: 'Network / VPN',
-                    subtype: 'VPN',
                     subject: 'VPN disconnects every 30 minutes',
                     description: 'My corporate VPN connection drops every half hour when working from home. I have to re-authenticate each time. Using Cisco AnyConnect client on Windows 11. This has been happening for the past 3 days.'
                 },
                 'github': {
-                    context: 'Access / Permission',
-                    subtype: '',
                     subject: 'Need GitHub Enterprise access',
                     description: 'Just joined the backend development team and need access to GitHub Enterprise organization. Manager is Sarah Chen. Need read/write access to api-services and data-pipeline repositories for my project work.'
                 },
                 'security': {
-                    context: 'Software / Application',
-                    subtype: 'Email',
                     subject: 'Suspicious email asking for password reset',
                     description: 'I received an email claiming to be from IT asking me to click a link and enter my credentials. The link looks suspicious: http://compamy-login.tk. I did not click it. Is this a phishing attempt? I want to report this security concern.'
                 },
                 'coffee': {
-                    context: 'Facilities',
-                    subtype: '',
                     subject: 'Coffee machine not working on 3rd floor',
                     description: 'The office coffee machine in the break room is not dispensing coffee. Display shows error code E-04. This has been broken since yesterday morning and is affecting team morale. Please send someone to fix or replace it.'
                 },
                 'outlook': {
-                    context: 'Software / Application',
-                    subtype: 'Outlook',
                     subject: 'Outlook keeps crashing when opening attachments',
                     description: 'Microsoft Outlook crashes every time I try to open PDF attachments. Error message says "Outlook has stopped working". I have tried restarting the application and my computer but the problem persists. This is blocking my work.'
                 },
                 'laptop': {
-                    context: 'Hardware / Device',
-                    subtype: 'Laptop',
                     subject: 'Laptop overheating during video calls',
                     description: 'My work laptop gets extremely hot during Microsoft Teams video calls. Fans run at maximum speed and the bottom of the laptop is too hot to touch. Sometimes it shuts down unexpectedly. This started after the latest Windows update.'
                 }
@@ -541,22 +441,6 @@
             
             const ticket = testTickets[type];
             if (ticket) {
-                document.getElementById('context').value = ticket.context;
-                updateSubtypeOptions();
-                
-                // Set subtype after a brief delay to ensure subtype fields are rendered
-                setTimeout(() => {
-                    const subtypeSelect = document.getElementById('subtype-select');
-                    const subtypeText = document.getElementById('subtype-text');
-                    
-                    if (subtypeSelect.style.display !== 'none' && ticket.subtype) {
-                        subtypeSelect.value = ticket.subtype;
-                    }
-                    if (subtypeText.style.display !== 'none' && ticket.subtype) {
-                        subtypeText.value = ticket.subtype;
-                    }
-                }, 100);
-                
                 document.getElementById('subject').value = ticket.subject;
                 document.getElementById('description').value = ticket.description;
                 
