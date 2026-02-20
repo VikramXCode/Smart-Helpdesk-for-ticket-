@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB, require_it_staff
-from app.models import AuditLog, KnowledgeArticle, Ticket, TicketMessage, User
+from app.models import AuditLog, Ticket, TicketMessage, User
 from app.schemas import (
     AISuggestionOut,
     AssignedTeamOut,
@@ -39,6 +39,7 @@ from app.schemas import (
     TicketUpdate,
 )
 from app.services import ai
+from app.services.ai_client import analyze_ticket_with_ai
 from app.services.vector import find_similar_articles
 from app.utils.exceptions import ForbiddenError, NotFoundError
 
@@ -103,7 +104,7 @@ async def _get_ticket_or_404(db: AsyncSession, ticket_id: uuid.UUID) -> Ticket:
 
 def _build_ticket_list_item(ticket: Ticket, creator: Optional[User] = None, assignee: Optional[User] = None) -> TicketListItem:
     """Build a TicketListItem from a Ticket ORM object."""
-    has_ai = bool(ticket.ai_suggestion or ticket.suggested_article_id)
+    has_ai = bool(ticket.ai_response or ticket.ai_suggestion)
     creator_obj = creator or getattr(ticket, 'creator', None)
     assignee_obj = assignee or getattr(ticket, 'assignee_user', None)
 
@@ -123,6 +124,8 @@ def _build_ticket_list_item(ticket: Ticket, creator: Optional[User] = None, assi
         created_by=ticket.created_by,
         creator_name=creator_obj.full_name if creator_obj else None,
         has_ai_insight=has_ai,
+        ai_confidence=ticket.ai_confidence,
+        ai_predicted_category=ticket.ai_predicted_category,
         created_at=ticket.created_at,
         updated_at=ticket.updated_at,
         reported_at=_relative_time(ticket.created_at),
@@ -135,7 +138,7 @@ def _build_ticket_list_item(ticket: Ticket, creator: Optional[User] = None, assi
 
 @router.post("/", response_model=TicketListItem, status_code=status.HTTP_201_CREATED)
 async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB):
-    """Create a new ticket and enqueue background AI processing."""
+    """Create a new ticket with AI analysis and auto-resolution where applicable."""
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="Super admins cannot create tickets directly")
 
@@ -146,6 +149,39 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
     count = count_result.scalar() or 0
     ticket_number = f"INC-{count + 1:05d}"
 
+    # Call AI service for analysis
+    ai_analysis = None
+    initial_status = "new"  # Default status
+    ai_response_text = None
+    ai_conf = None
+    ai_cat = None
+    ai_priority = None
+    is_duplicate = False
+
+    try:
+        # Analyzeticket with AI
+        ai_analysis = await analyze_ticket_with_ai(
+            subject=payload.title,
+            description=payload.description,
+            company_id=str(current_user.company_id)
+        )
+
+        if ai_analysis and ai_analysis.get("success"):
+            ai_response_text = ai_analysis.get("ai_response")
+            ai_conf = ai_analysis.get("confidence")
+            ai_cat = ai_analysis.get("category")
+            ai_priority = ai_analysis.get("priority")
+            is_duplicate = ai_analysis.get("is_duplicate", False)
+
+            # Auto-resolve if AI determines it should be resolved
+            if ai_analysis.get("should_resolve", False):
+                initial_status = "resolved"
+    except Exception as e:
+        # AI service unavailable - continue without AIanalysis
+        print(f"AI analysis failed: {e}")
+        pass
+
+    # Create ticket with AI data
     ticket = Ticket(
         company_id=current_user.company_id,
         ticket_number=ticket_number,
@@ -155,28 +191,43 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
         source=payload.source,
         department=payload.department,
         created_by=current_user.id,
-        status="new",
+        status=initial_status,
+        # AI fields
+        ai_response=ai_response_text,
+        ai_confidence=ai_conf,
+        ai_predicted_category=ai_cat,
+        ai_suggested_priority=ai_priority,
+        is_ai_duplicate=is_duplicate,
+        resolved_at=datetime.now(timezone.utc) if initial_status == "resolved" else None,
     )
     db.add(ticket)
 
+    # If AI provided a response, add it as the first message in the thread
+    if ai_response_text:
+        ai_message = TicketMessage(
+            ticket_id=ticket.id,
+            author_id=None,  # System/AI message
+            content=ai_response_text,
+            is_internal=False,
+        )
+        db.add(ai_message)
+
     # Audit
+    audit_details = {
+        "title": payload.title,
+        "priority": payload.priority,
+        "ai_analyzed": bool(ai_analysis),
+        "auto_resolved": initial_status == "resolved"
+    }
     db.add(AuditLog(
         company_id=current_user.company_id,
         user_id=current_user.id,
         action="ticket_created",
-        details={"title": payload.title, "priority": payload.priority},
+        details=audit_details,
     ))
 
     await db.commit()
     await db.refresh(ticket)
-
-    # Enqueue background processing (non-blocking)
-    try:
-        from app.tasks.ticket_processing import process_new_ticket  # noqa: PLC0415
-        process_new_ticket.delay(str(ticket.id))
-    except Exception:
-        # Celery not available – process inline (development fallback)
-        pass
 
     return _build_ticket_list_item(ticket, creator=current_user)
 
@@ -379,7 +430,6 @@ async def get_ticket(ticket_id: uuid.UUID, current_user: CurrentUser, db: DB):
         assigned_team=ticket.assigned_team,
         assigned_team_detail=assigned_team_detail,
         ai_suggestion=ai_suggestion,
-        suggested_article_id=ticket.suggested_article_id,
         messages=messages_out,
         similar_articles=similar_articles,
     )

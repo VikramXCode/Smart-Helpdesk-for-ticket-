@@ -348,20 +348,7 @@ const TicketDetailView = () => {
               </div>
             )}
 
-            {/* Related articles */}
-            {similarArticles.length > 0 && (
-              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">Related Articles</h3>
-                <div className="space-y-3">
-                  {similarArticles.map((article, i) => (
-                    <Link to="/knowledge" key={i} className="block p-3 rounded-lg border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">{article.title}</h4>
-                      {article.category && <span className="text-xs text-slate-500">{article.category}</span>}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* End of sections */}
           </div>
         </div>
       </div>

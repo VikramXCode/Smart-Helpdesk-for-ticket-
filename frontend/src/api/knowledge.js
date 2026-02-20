@@ -1,16 +1,23 @@
-import api from './axios';
+import api, { USE_MOCK_DATA } from './axios';
+import {
+  mockListArticles,
+  mockGetArticle,
+  mockCreateArticle,
+  mockUpdateArticle,
+  mockDeleteArticle,
+} from './mockData';
 
 export const listArticles = (params = {}) =>
-  api.get('/knowledge/', { params });
+  USE_MOCK_DATA ? mockListArticles(params) : api.get('/knowledge/', { params });
 
 export const getArticle = (id) =>
-  api.get(`/knowledge/${id}`);
+  USE_MOCK_DATA ? mockGetArticle(id) : api.get(`/knowledge/${id}`);
 
 export const createArticle = (data) =>
-  api.post('/knowledge/', data);
+  USE_MOCK_DATA ? mockCreateArticle(data) : api.post('/knowledge/', data);
 
 export const updateArticle = (id, data) =>
-  api.patch(`/knowledge/${id}`, data);
+  USE_MOCK_DATA ? mockUpdateArticle(id, data) : api.patch(`/knowledge/${id}`, data);
 
 export const deleteArticle = (id) =>
-  api.delete(`/knowledge/${id}`);
+  USE_MOCK_DATA ? mockDeleteArticle(id) : api.delete(`/knowledge/${id}`);

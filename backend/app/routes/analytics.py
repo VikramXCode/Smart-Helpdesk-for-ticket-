@@ -17,6 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
+from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.models import Team, Ticket, TrendCluster, User
 from app.schemas import (
@@ -108,8 +109,12 @@ async def get_overview(current_user: CurrentUser, db: DB):
             avg_resolution_time = f"{avg_hours / 24:.1f}d"
         avg_resolution_change = "-12%"
     else:
-        avg_resolution_time = "4.2h"
-        avg_resolution_change = "-12%"
+        if settings.USE_MOCK_DATA:
+            avg_resolution_time = "4.2h"
+            avg_resolution_change = "-12%"
+        else:
+            avg_resolution_time = "0h"
+            avg_resolution_change = "+0%"
 
     # SLA compliance: tickets resolved within 8h / total resolved
     if resolved_rows:
@@ -122,7 +127,7 @@ async def get_overview(current_user: CurrentUser, db: DB):
         )
         sla_compliance = round((within_sla / len(resolved_rows)) * 100, 1)
     else:
-        sla_compliance = 94.2
+        sla_compliance = 94.2 if settings.USE_MOCK_DATA else 0.0
 
     # AI resolution rate: tickets with ai_suggestion set / total resolved
     r_ai = await db.execute(
@@ -144,14 +149,14 @@ async def get_overview(current_user: CurrentUser, db: DB):
     ai_resolution_rate = round((ai_resolved / total_resolved) * 100, 1) if total_resolved > 0 else 67.3
 
     return AnalyticsOverview(
-        total_tickets_7d=tickets_7d if tickets_7d > 0 else 247,
+        total_tickets_7d=tickets_7d if tickets_7d > 0 or not settings.USE_MOCK_DATA else 247,
         total_tickets_change=tickets_change,
         avg_resolution_time=avg_resolution_time,
         avg_resolution_change=avg_resolution_change,
         sla_compliance=sla_compliance,
-        sla_compliance_change="+2.1%",
-        active_tickets=active_tickets if active_tickets > 0 else 43,
-        active_tickets_change="-8%",
+        sla_compliance_change="+2.1%" if settings.USE_MOCK_DATA else "+0%",
+        active_tickets=active_tickets if active_tickets > 0 or not settings.USE_MOCK_DATA else 43,
+        active_tickets_change="-8%" if settings.USE_MOCK_DATA else "+0%",
         user_satisfaction=4.6,
         user_satisfaction_change="+0.2",
         ai_resolution_rate=ai_resolution_rate,
@@ -194,7 +199,7 @@ async def get_volume(
         values.append(count)
 
     # Fall back to realistic mock data if DB has no real tickets yet
-    if sum(values) == 0:
+    if settings.USE_MOCK_DATA and sum(values) == 0:
         if days == 7:
             values = [32, 41, 28, 55, 47, 38, 62]
             labels = [(now - timedelta(days=i)).strftime("%b %d") for i in range(6, -1, -1)]
@@ -227,7 +232,7 @@ async def get_categories(current_user: CurrentUser, db: DB):
 
     total = sum(row.cnt for row in rows)
 
-    if total == 0:
+    if settings.USE_MOCK_DATA and total == 0:
         # Fallback mock data matching the frontend design
         mock = [
             ("Network", 82),
@@ -321,7 +326,7 @@ async def get_team_performance(current_user: CurrentUser, db: DB):
         )
 
     # Fallback if no team data
-    if not results:
+    if settings.USE_MOCK_DATA and not results:
         results = [
             TeamPerformanceItem(team_name="IT Ops", avg_resolution_hours=3.2, total_tickets=45, resolved_tickets=40),
             TeamPerformanceItem(team_name="Network Team", avg_resolution_hours=5.8, total_tickets=32, resolved_tickets=28),

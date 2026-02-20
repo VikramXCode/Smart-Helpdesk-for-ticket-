@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AdminLayout } from '../components/AdminLayout';
 import { listTickets } from '../api/tickets';
 import toast from 'react-hot-toast';
 
 const ItStaffTicketList = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [total, setTotal] = useState(0);
@@ -104,76 +105,19 @@ const ItStaffTicketList = () => {
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
+  const headerAction = (
+    <div className="hidden md:flex relative group">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-[20px]">search</span>
+      <input className="pl-10 pr-4 py-2 w-64 text-sm bg-slate-50 border-none ring-1 ring-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all placeholder:text-slate-400"
+        placeholder="Search tickets..." type="text" value={search}
+        onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+    </div>
+  );
+
   return (
-    <div className="w-full">
-      <div className="relative flex h-full min-h-screen w-full flex-row overflow-hidden">
-        {/* Sidebar */}
-        <div className="hidden lg:flex flex-col w-64 border-r border-slate-200 bg-white h-screen sticky top-0 shrink-0">
-          <div className="p-6 flex items-center gap-3">
-            <div className="bg-primary aspect-square rounded-lg size-10 flex items-center justify-center text-white">
-              <span className="material-symbols-outlined text-2xl">smart_toy</span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-slate-900 text-base font-bold leading-none">HelpDesk AI</h1>
-              <p className="text-slate-500 text-xs font-medium mt-1">Staff Console</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1 px-3 py-2 flex-1 overflow-y-auto">
-            {user?.role === 'company_admin' && (
-              <Link to="/admin" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors group">
-                <span className="material-symbols-outlined text-[20px] text-slate-400 group-hover:text-primary">dashboard</span>
-                <span className="text-sm font-medium">Dashboard</span>
-              </Link>
-            )}
-            <Link to="/staff/tickets" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/5 text-primary">
-              <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
-              <span className="text-sm font-medium">Tickets</span>
-              {total > 0 && <span className="ml-auto bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{total}</span>}
-            </Link>
-            <Link to="/knowledge" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors group">
-              <span className="material-symbols-outlined text-[20px] text-slate-400 group-hover:text-primary">menu_book</span>
-              <span className="text-sm font-medium">Knowledge Base</span>
-            </Link>
-          </div>
-          <div className="p-3 mt-auto border-t border-slate-100">
-            <button onClick={logout} className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors group mb-1 w-full">
-              <span className="material-symbols-outlined text-[20px] text-slate-400 group-hover:text-primary">logout</span>
-              <span className="text-sm font-medium">Sign Out</span>
-            </button>
-            <div className="flex items-center gap-3 px-3 py-3 mt-2 rounded-lg bg-slate-50 border border-slate-100">
-              <div className="relative">
-                <div className="size-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">{user?.full_name?.charAt(0)}</div>
-                <div className="absolute bottom-0 right-0 size-2.5 bg-green-500 rounded-full border-2 border-white"></div>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <p className="text-slate-900 text-sm font-semibold truncate">{user?.full_name}</p>
-                <p className="text-slate-500 text-xs truncate">{user?.role?.replace('_', ' ')}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div className="flex-1 flex flex-col h-screen overflow-hidden bg-background-light">
-          <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shrink-0">
-            <div className="flex items-center gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Ticket Management</h2>
-                <p className="text-xs text-slate-500 hidden sm:block">Manage and resolve support requests</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden md:flex relative group">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-[20px]">search</span>
-                <input className="pl-10 pr-4 py-2 w-64 text-sm bg-slate-50 border-none ring-1 ring-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all placeholder:text-slate-400"
-                  placeholder="Search tickets..." type="text" value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-              </div>
-            </div>
-          </header>
-
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-            <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
+    <AdminLayout title="Ticket Management" headerAction={headerAction}>
+      <div className="p-4 md:p-6 lg:p-8">
+        <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
               {/* Stat cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -318,10 +262,8 @@ const ItStaffTicketList = () => {
                 )}
               </div>
             </div>
-          </main>
-        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

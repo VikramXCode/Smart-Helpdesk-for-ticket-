@@ -6,9 +6,9 @@ import SaasHelpdeskLogin from './pages/SaasHelpdeskLogin';
 import CompanyAdminDashboard from './pages/CompanyAdminDashboard';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import ItStaffTicketList from './pages/ItStaffTicketList';
-import KnowledgeBaseGrid from './pages/KnowledgeBaseGrid';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import TicketDetailView from './pages/TicketDetailView';
+import KnowledgeBaseGrid from './pages/KnowledgeBaseGrid';
 import './App.css';
 
 const RoleRedirect = () => {

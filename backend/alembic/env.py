@@ -26,7 +26,9 @@ from app.models import Base  # noqa: E402
 from app.config import settings  # noqa: E402
 
 # Override the sqlalchemy.url from alembic.ini with the real settings value
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Escape % characters to avoid ConfigParser interpolation errors
+database_url = settings.DATABASE_URL.replace('%', '%%')
+config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

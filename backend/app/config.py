@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # ── App ───────────────────────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"
+    USE_MOCK_DATA: bool = False
 
     # ── Trend Detection ───────────────────────────────────────────────────────
     TREND_MIN_CLUSTER_SIZE: int = 3

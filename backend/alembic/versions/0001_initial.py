@@ -72,21 +72,6 @@ def upgrade() -> None:
         sa.UniqueConstraint("company_id", "category", name="uq_mapping_company_category"),
     )
 
-    # knowledge_articles
-    op.create_table(
-        "knowledge_articles",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("company_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("title", sa.String(500), nullable=False),
-        sa.Column("content", sa.Text, nullable=False),
-        sa.Column("category", sa.String(100), nullable=True),
-        sa.Column("author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("view_count", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("embedding", sa.Text, nullable=True),  # vector stored as text, cast in queries
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
-    )
-
     # tickets
     op.create_table(
         "tickets",
@@ -104,7 +89,6 @@ def upgrade() -> None:
         sa.Column("source", sa.Enum("web", "chat", "email", "mobile", "glpi", "solman", name="ticket_source"), nullable=False, server_default="web"),
         sa.Column("department", sa.String(100), nullable=True),
         sa.Column("embedding", sa.Text, nullable=True),
-        sa.Column("suggested_article_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("knowledge_articles.id", ondelete="SET NULL"), nullable=True),
         sa.Column("ai_suggestion", sa.Text, nullable=True),
         sa.Column("due_date", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
@@ -174,7 +158,7 @@ def downgrade() -> None:
     op.drop_table("notifications_config")
     op.drop_table("ticket_messages")
     op.drop_table("tickets")
-    op.drop_table("knowledge_articles")
+
     op.drop_table("company_team_mappings")
     op.drop_table("users")
     op.drop_table("teams")

@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.dependencies import engine
 from app.models import Base
-from app.routes import auth, tickets, chat, knowledge, analytics, admin, super_admin, webhooks
+from app.routes import auth, tickets, chat, analytics, admin, super_admin, webhooks, knowledge
 from app.utils.exceptions import register_exception_handlers
 
 

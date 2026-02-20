@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AdminLayout } from '../components/AdminLayout';
 import { createTicket, listTickets } from '../api/tickets';
 import { getOverview } from '../api/analytics';
 import { sendChat } from '../api/chat';
 import toast from 'react-hot-toast';
 
 const EmployeeDashboard = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
@@ -117,39 +117,7 @@ const EmployeeDashboard = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-background-light dark:bg-slate-900">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-primary dark:text-white">
-                <div className="size-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                  <span className="material-symbols-outlined">smart_toy</span>
-                </div>
-                <h2 className="text-xl font-bold tracking-tight">HelpDesk AI</h2>
-              </div>
-              <nav className="hidden md:flex ml-8 gap-6 text-sm font-medium text-slate-500 dark:text-slate-400">
-                <Link to="/dashboard" className="text-slate-900 dark:text-white hover:text-blue-600 transition-colors">Dashboard</Link>
-                <Link to="/knowledge" className="hover:text-blue-600 transition-colors">Knowledge Base</Link>
-              </nav>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center relative">
-                <span className="absolute left-3 text-slate-400"><span className="material-symbols-outlined text-[20px]">search</span></span>
-                <input className="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm w-64 focus:ring-2 focus:ring-blue-500 placeholder-slate-500" placeholder="Search knowledge base..." type="text" />
-              </div>
-              <div className="flex items-center gap-2 cursor-pointer" onClick={logout}>
-                <div className="size-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                  {user?.full_name?.charAt(0) || 'U'}
-                </div>
-                <span className="hidden sm:inline text-sm font-medium text-slate-700 dark:text-slate-300">{user?.full_name}</span>
-                <span className="material-symbols-outlined text-slate-400 text-[18px]">logout</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <AdminLayout title="Dashboard">
       <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Welcome back, {user?.full_name?.split(' ')[0] || 'User'}</h1>
@@ -350,7 +318,7 @@ const EmployeeDashboard = () => {
           </span>
         </button>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

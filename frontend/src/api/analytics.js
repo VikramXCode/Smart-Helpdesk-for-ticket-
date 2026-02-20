@@ -1,16 +1,23 @@
-import api from './axios';
+import api, { USE_MOCK_DATA } from './axios';
+import {
+  mockGetOverview,
+  mockGetVolume,
+  mockGetCategories,
+  mockGetTeamPerformance,
+  mockGetTrends,
+} from './mockData';
 
 export const getOverview = () =>
-  api.get('/analytics/overview');
+  USE_MOCK_DATA ? mockGetOverview() : api.get('/analytics/overview');
 
 export const getVolume = (period = '7d') =>
-  api.get('/analytics/volume', { params: { period } });
+  USE_MOCK_DATA ? mockGetVolume(period) : api.get('/analytics/volume', { params: { period } });
 
 export const getCategories = () =>
-  api.get('/analytics/categories');
+  USE_MOCK_DATA ? mockGetCategories() : api.get('/analytics/categories');
 
 export const getTeamPerformance = () =>
-  api.get('/analytics/team-performance');
+  USE_MOCK_DATA ? mockGetTeamPerformance() : api.get('/analytics/team-performance');
 
 export const getTrends = () =>
-  api.get('/analytics/trends');
+  USE_MOCK_DATA ? mockGetTrends() : api.get('/analytics/trends');

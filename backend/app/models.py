@@ -156,6 +156,7 @@ class Team(Base):
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -232,11 +233,12 @@ class Ticket(Base):
     embedding: Mapped[Optional[List[float]]] = mapped_column(
         Vector(768), nullable=True
     )
-    suggested_article_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("knowledge_articles.id", ondelete="SET NULL"),
-        nullable=True,
-    )
+    # AI-generated fields
+    ai_response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ai_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
+    ai_predicted_category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ai_suggested_priority: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    is_ai_duplicate: Mapped[Optional[bool]] = mapped_column(nullable=True, default=False)
     ai_suggestion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     due_date: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -258,9 +260,6 @@ class Ticket(Base):
     )
     assignee_user: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[assigned_to], back_populates="assigned_tickets"
-    )
-    suggested_article: Mapped[Optional["KnowledgeArticle"]] = relationship(
-        "KnowledgeArticle"
     )
     messages: Mapped[List["TicketMessage"]] = relationship(
         "TicketMessage", back_populates="ticket", order_by="TicketMessage.created_at"
@@ -299,38 +298,6 @@ class TicketMessage(Base):
 # ─────────────────────────────────────────────────────────────────────────────
 # Knowledge Articles
 # ─────────────────────────────────────────────────────────────────────────────
-
-class KnowledgeArticle(Base):
-    __tablename__ = "knowledge_articles"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
-    )
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(
-        Vector(768), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    # Relationships
-    company: Mapped["Company"] = relationship(
-        "Company", back_populates="knowledge_articles"
-    )
-    author: Mapped[Optional["User"]] = relationship("User")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -384,6 +351,39 @@ class AuditLog(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Knowledge Base Articles
+# ─────────────────────────────────────────────────────────────────────────────
+
+class KnowledgeArticle(Base):
+    __tablename__ = "knowledge_articles"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(768), nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    company: Mapped["Company"] = relationship("Company", back_populates="knowledge_articles")
+    author: Mapped[Optional["User"]] = relationship("User", foreign_keys=[author_id])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

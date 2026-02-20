@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AdminLayout } from '../components/AdminLayout';
 import { getOverview, getVolume, getCategories } from '../api/analytics';
-import { listAgents, createAgent, listTeams } from '../api/admin';
+import { listAgents, createAgent, listTeams, createTeam, updateTeam, deleteTeam, assignAgentToTeam, removeAgentFromTeam } from '../api/admin';
 import toast from 'react-hot-toast';
 
 const CompanyAdminDashboard = () => {
@@ -20,6 +21,11 @@ const CompanyAdminDashboard = () => {
   // Add Agent modal
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [newAgent, setNewAgent] = useState({ email: '', full_name: '', password: '', role: 'it_staff', department: '' });
+
+  // Add Team modal
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [newTeam, setNewTeam] = useState({ name: '', description: '', email: '' });
+  const [editingTeamId, setEditingTeamId] = useState(null);
 
   useEffect(() => { loadData(); }, []);
   useEffect(() => { getVolume(volumePeriod).then(r => setVolume(r.data)).catch(() => {}); }, [volumePeriod]);
@@ -56,6 +62,42 @@ const CompanyAdminDashboard = () => {
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to add agent');
     }
+  };
+
+  const handleAddTeam = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingTeamId) {
+        await updateTeam(editingTeamId, newTeam);
+        toast.success('Team updated successfully');
+      } else {
+        await createTeam(newTeam);
+        toast.success('Team created successfully');
+      }
+      setShowAddTeam(false);
+      setNewTeam({ name: '', description: '', email: '' });
+      setEditingTeamId(null);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to save team');
+    }
+  };
+
+  const handleDeleteTeam = async (teamId) => {
+    if (!window.confirm('Are you sure you want to delete this team?')) return;
+    try {
+      await deleteTeam(teamId);
+      toast.success('Team deleted successfully');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to delete team');
+    }
+  };
+
+  const openEditTeam = (team) => {
+    setEditingTeamId(team.id);
+    setNewTeam({ name: team.name, description: team.description || '', email: team.email || '' });
+    setShowAddTeam(true);
   };
 
   // Build SVG chart path from volume data
@@ -102,62 +144,17 @@ const CompanyAdminDashboard = () => {
   const statusDot = (s) => s === 'online' ? 'bg-emerald-500' : s === 'away' ? 'bg-amber-500' : 'bg-slate-500';
 
   const o = overview || {};
+  const headerAction = (
+    <button onClick={() => navigate('/staff/tickets')} className="flex items-center gap-2 bg-primary hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
+      <span className="material-symbols-outlined text-[20px]">confirmation_number</span><span>View Tickets</span>
+    </button>
+  );
 
   return (
     <div className="w-full">
-      <div className="flex h-screen w-full overflow-hidden">
-        {/* Sidebar */}
-        <div className="flex flex-col w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 h-full flex-shrink-0 hidden lg:flex">
-          <div className="p-6 flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">
-              <span className="material-symbols-outlined">smart_toy</span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-primary dark:text-white text-base font-bold leading-tight">HelpDesk AI</h1>
-              <p className="text-slate-500 text-xs font-medium">Admin Portal</p>
-            </div>
-          </div>
-          <nav className="flex flex-col gap-1 px-4 py-4 flex-1">
-            <Link to="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/5 text-primary dark:text-white dark:bg-slate-700/50">
-              <span className="material-symbols-outlined">dashboard</span><span className="text-sm font-medium">Dashboard</span>
-            </Link>
-            <Link to="/staff/tickets" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
-              <span className="material-symbols-outlined">confirmation_number</span><span className="text-sm font-medium">Tickets</span>
-            </Link>
-            <Link to="/knowledge" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
-              <span className="material-symbols-outlined">menu_book</span><span className="text-sm font-medium">Knowledge Base</span>
-            </Link>
-            <div className="my-4 border-t border-slate-100 dark:border-slate-700"></div>
-            <button onClick={logout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors w-full text-left">
-              <span className="material-symbols-outlined">logout</span><span className="text-sm font-medium">Sign Out</span>
-            </button>
-          </nav>
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-3 p-2 rounded-lg">
-              <div className="size-9 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">{user?.full_name?.charAt(0)}</div>
-              <div className="flex flex-col overflow-hidden">
-                <p className="text-slate-900 dark:text-white text-sm font-medium truncate">{user?.full_name}</p>
-                <p className="text-slate-500 text-xs truncate">{user?.role?.replace('_', ' ')}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-background-light dark:bg-slate-900">
-          <header className="flex items-center justify-between px-8 py-5 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-bold text-primary dark:text-white tracking-tight">Company Overview</h2>
-            </div>
-            <div className="flex items-center gap-4">
-              <button onClick={() => navigate('/staff/tickets')} className="flex items-center gap-2 bg-primary hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
-                <span className="material-symbols-outlined text-[20px]">confirmation_number</span><span>View Tickets</span>
-              </button>
-            </div>
-          </header>
-
-          <main className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-7xl mx-auto flex flex-col gap-8">
+      <AdminLayout title="Company Overview" headerAction={headerAction}>
+        <div className="p-8">
+          <div className="max-w-7xl mx-auto flex flex-col gap-8">
               {/* KPI Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between h-full">
@@ -319,26 +316,46 @@ const CompanyAdminDashboard = () => {
                     </>
                   )}
                   {activeTab === 'teams' && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-primary dark:text-white">Teams</h3>
-                      {teams.length === 0 ? <p className="text-slate-400 text-sm">No teams configured</p> : (
+                    <>
+                      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                        <h3 className="text-lg font-bold text-primary dark:text-white">Helpdesk Teams</h3>
+                        <button onClick={() => { setEditingTeamId(null); setNewTeam({ name: '', description: '', email: '' }); setShowAddTeam(true); }} className="flex items-center gap-2 bg-accent hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                          <span className="material-symbols-outlined text-[20px]">group_add</span><span>Add Team</span>
+                        </button>
+                      </div>
+                      {teams.length === 0 ? (
+                        <p className="text-slate-400 text-sm text-center py-8">No teams configured yet. Create one to get started.</p>
+                      ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {teams.map(t => (
-                            <div key={t.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
-                              <h4 className="font-semibold text-slate-900 dark:text-white">{t.name}</h4>
-                              {t.email && <p className="text-sm text-slate-500">{t.email}</p>}
+                            <div key={t.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-md transition-shadow">
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-slate-900 dark:text-white">{t.name}</h4>
+                                  {t.description && <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{t.description}</p>}
+                                  {t.email && <p className="text-xs text-slate-500 mt-2">{t.email}</p>}
+                                  <p className="text-xs text-slate-400 mt-2">Members: <span className="font-semibold">{t.member_count || 0}</span></p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={() => openEditTeam(t)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-400">
+                                    <span className="material-symbols-outlined text-[20px]">edit</span>
+                                  </button>
+                                  <button onClick={() => handleDeleteTeam(t.id)} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded text-red-600">
+                                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
             </div>
-          </main>
-        </div>
-      </div>
+          </div>
+      </AdminLayout>
 
       {/* Add Agent Modal */}
       {showAddAgent && (
@@ -357,6 +374,24 @@ const CompanyAdminDashboard = () => {
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddAgent(false)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors">Add Agent</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Team Modal */}
+      {showAddTeam && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setShowAddTeam(false); setEditingTeamId(null); }}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{editingTeamId ? 'Edit Team' : 'Create New Team'}</h3>
+            <form onSubmit={handleAddTeam} className="space-y-4">
+              <input className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5 text-slate-900 dark:text-white" placeholder="Team Name" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} required />
+              <textarea className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5 text-slate-900 dark:text-white" placeholder="Team Description (what does this team handle?)" value={newTeam.description} onChange={e => setNewTeam({...newTeam, description: e.target.value})} rows="3" />
+              <input className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5 text-slate-900 dark:text-white" placeholder="Team Email (optional)" type="email" value={newTeam.email} onChange={e => setNewTeam({...newTeam, email: e.target.value})} />
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => { setShowAddTeam(false); setEditingTeamId(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors dark:text-white">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors">{editingTeamId ? 'Update Team' : 'Create Team'}</button>
               </div>
             </form>
           </div>

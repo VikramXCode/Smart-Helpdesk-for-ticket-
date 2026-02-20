@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AdminLayout } from '../components/AdminLayout';
 import { getStats, listCompanies, createCompany, updateCompany, deleteCompany } from '../api/superadmin';
 import toast from 'react-hot-toast';
 
 const SuperAdminDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,56 +70,15 @@ const SuperAdminDashboard = () => {
     );
   }
 
+  const headerAction = (
+    <button onClick={() => setShowAddCompany(true)} className="flex items-center gap-2 h-9 px-4 bg-primary text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
+      <span className="material-symbols-outlined text-[18px]">add</span> Onboard Tenant
+    </button>
+  );
+
   return (
-    <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-900 flex">
-      {/* Sidebar */}
-      <aside className="hidden lg:flex lg:w-64 xl:w-72 flex-col bg-slate-900 text-white min-h-screen sticky top-0 p-0">
-        <div className="flex items-center gap-3 px-6 pt-6 pb-4">
-          <div className="size-9 rounded-lg bg-primary flex items-center justify-center">
-            <span className="material-symbols-outlined text-white">smart_toy</span>
-          </div>
-          <div>
-            <p className="font-bold text-sm tracking-tight">HelpDesk AI</p>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest">Super Admin</p>
-          </div>
-        </div>
-        <nav className="flex-1 px-4 py-4 space-y-1">
-          <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/10 text-white text-sm font-medium">
-            <span className="material-symbols-outlined text-[20px]">dashboard</span> Dashboard
-          </a>
-          <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors cursor-pointer" onClick={() => document.getElementById('tenantsSection')?.scrollIntoView({ behavior: 'smooth' })}>
-            <span className="material-symbols-outlined text-[20px]">apartment</span> Tenants
-          </a>
-          <Link to="/knowledge" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors">
-            <span className="material-symbols-outlined text-[20px]">menu_book</span> Knowledge Base
-          </Link>
-        </nav>
-        <div className="border-t border-white/10 px-4 py-4">
-          <button onClick={logout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors w-full">
-            <span className="material-symbols-outlined text-[20px]">logout</span> Logout
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Platform Dashboard</h1>
-            <p className="text-xs text-slate-500">Welcome back, {user?.full_name}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowAddCompany(true)} className="flex items-center gap-2 h-9 px-4 bg-primary text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
-              <span className="material-symbols-outlined text-[18px]">add</span> Onboard Tenant
-            </button>
-            <div className="size-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold cursor-pointer" onClick={logout}>
-              {user?.full_name?.charAt(0)}
-            </div>
-          </div>
-        </header>
-
-        <div className="flex-1 p-6 space-y-6">
+    <AdminLayout title="Platform Dashboard" headerAction={headerAction}>
+      <div className="p-6 space-y-6">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
@@ -252,7 +211,6 @@ const SuperAdminDashboard = () => {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Add Company Modal */}
       {showAddCompany && (
@@ -281,7 +239,7 @@ const SuperAdminDashboard = () => {
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

@@ -41,6 +41,8 @@ from app.schemas import (
     TeamCreate,
     TeamOut,
     TeamUpdate,
+    TeamAssignAgentRequest,
+    TeamRemoveAgentRequest,
 )
 from app.utils.exceptions import ForbiddenError, NotFoundError
 
@@ -214,6 +216,7 @@ async def list_teams(current_user: CurrentUser, db: DB):
                 id=team.id,
                 company_id=team.company_id,
                 name=team.name,
+                description=team.description,
                 email=team.email,
                 member_count=member_count,
                 created_at=team.created_at,
@@ -236,7 +239,12 @@ async def create_team(payload: TeamCreate, current_user: CurrentUser, db: DB):
     if r.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Team name already exists")
 
-    team = Team(company_id=cid, name=payload.name, email=str(payload.email) if payload.email else None)
+    team = Team(
+        company_id=cid,
+        name=payload.name,
+        description=payload.description,
+        email=str(payload.email) if payload.email else None
+    )
     db.add(team)
     await db.commit()
     await db.refresh(team)
@@ -244,6 +252,7 @@ async def create_team(payload: TeamCreate, current_user: CurrentUser, db: DB):
         id=team.id,
         company_id=team.company_id,
         name=team.name,
+        description=team.description,
         email=team.email,
         member_count=0,
         created_at=team.created_at,
@@ -252,7 +261,7 @@ async def create_team(payload: TeamCreate, current_user: CurrentUser, db: DB):
 
 @router.patch("/teams/{team_id}", response_model=TeamOut)
 async def update_team(team_id: uuid.UUID, payload: TeamUpdate, current_user: CurrentUser, db: DB):
-    """Update a team's name or email."""
+    """Update a team's name, description, or email."""
     r = await db.execute(select(Team).where(Team.id == team_id))
     team = r.scalar_one_or_none()
     if not team:
@@ -262,6 +271,8 @@ async def update_team(team_id: uuid.UUID, payload: TeamUpdate, current_user: Cur
 
     if payload.name is not None:
         team.name = payload.name
+    if payload.description is not None:
+        team.description = payload.description
     if payload.email is not None:
         team.email = str(payload.email)
 
@@ -274,6 +285,7 @@ async def update_team(team_id: uuid.UUID, payload: TeamUpdate, current_user: Cur
         id=team.id,
         company_id=team.company_id,
         name=team.name,
+        description=team.description,
         email=team.email,
         member_count=member_count,
         created_at=team.created_at,
@@ -290,6 +302,67 @@ async def delete_team(team_id: uuid.UUID, current_user: CurrentUser, db: DB):
     if current_user.company_id and team.company_id != current_user.company_id:
         raise ForbiddenError()
     await db.delete(team)
+    await db.commit()
+
+
+@router.post("/teams/{team_id}/agents", response_model=AgentOut)
+async def assign_agent_to_team(
+    team_id: uuid.UUID,
+    payload: TeamAssignAgentRequest,
+    current_user: CurrentUser,
+    db: DB
+):
+    """Assign an agent to a team."""
+    # Verify team exists and belongs to current company
+    r_team = await db.execute(select(Team).where(Team.id == team_id))
+    team = r_team.scalar_one_or_none()
+    if not team:
+        raise NotFoundError("Team")
+    if current_user.company_id and team.company_id != current_user.company_id:
+        raise ForbiddenError()
+
+    # Verify agent exists and is in the same company
+    r_agent = await db.execute(select(User).where(User.id == payload.agent_id))
+    agent = r_agent.scalar_one_or_none()
+    if not agent:
+        raise NotFoundError("Agent")
+    if agent.company_id != team.company_id:
+        raise HTTPException(status_code=400, detail="Agent must be from the same company")
+
+    # Assign agent to team
+    agent.team_id = team_id
+    await db.commit()
+    await db.refresh(agent)
+
+    return await _build_agent_out(agent, db)
+
+
+@router.delete("/teams/{team_id}/agents/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_agent_from_team(
+    team_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB
+):
+    """Remove an agent from a team."""
+    # Verify team exists and belongs to current company
+    r_team = await db.execute(select(Team).where(Team.id == team_id))
+    team = r_team.scalar_one_or_none()
+    if not team:
+        raise NotFoundError("Team")
+    if current_user.company_id and team.company_id != current_user.company_id:
+        raise ForbiddenError()
+
+    # Verify agent exists and is in the team
+    r_agent = await db.execute(select(User).where(User.id == agent_id))
+    agent = r_agent.scalar_one_or_none()
+    if not agent:
+        raise NotFoundError("Agent")
+    if agent.team_id != team_id:
+        raise HTTPException(status_code=400, detail="Agent is not in this team")
+
+    # Remove agent from team
+    agent.team_id = None
     await db.commit()
 
 

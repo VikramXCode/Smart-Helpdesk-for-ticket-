@@ -98,11 +98,13 @@ class CompanyListResponse(BaseModel):
 
 class TeamCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000)
     email: Optional[EmailStr] = None
 
 
 class TeamUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000)
     email: Optional[EmailStr] = None
 
 
@@ -110,11 +112,20 @@ class TeamOut(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID
     name: str
+    description: Optional[str] = None
     email: Optional[str] = None
     member_count: Optional[int] = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TeamAssignAgentRequest(BaseModel):
+    agent_id: uuid.UUID
+
+
+class TeamRemoveAgentRequest(BaseModel):
+    agent_id: uuid.UUID
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -244,8 +255,12 @@ class TicketOut(BaseModel):
     assigned_team_detail: Optional[AssignedTeamOut] = None
 
     # AI
+    ai_response: Optional[str] = None
+    ai_confidence: Optional[float] = None
+    ai_predicted_category: Optional[str] = None
+    ai_suggested_priority: Optional[str] = None
+    is_ai_duplicate: Optional[bool] = None
     ai_suggestion: Optional[AISuggestionOut] = None
-    suggested_article_id: Optional[uuid.UUID] = None
 
     # Nested
     messages: List[MessageOut] = []
@@ -271,6 +286,8 @@ class TicketListItem(BaseModel):
     created_by: uuid.UUID
     creator_name: Optional[str] = None
     has_ai_insight: bool = False
+    ai_confidence: Optional[float] = None
+    ai_predicted_category: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     reported_at: str = ""
