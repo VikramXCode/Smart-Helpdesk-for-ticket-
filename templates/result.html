@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Analysis Results - Smart Helpdesk</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .success-banner {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 6px;
+        }
+        
+        .success-banner h2 {
+            color: #155724;
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .success-banner p {
+            color: #155724;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .section-header h3 {
+            font-size: 16px;
+            color: #333;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-header h3 .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        .section-content {
+            padding: 20px;
+        }
+        
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            min-width: 180px;
+        }
+        
+        .info-value {
+            color: #333;
+            flex: 1;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .badge-critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-high {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-medium {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .badge-low {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .score-bar {
+            background: #e0e0e0;
+            height: 25px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .score-fill {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            transition: width 0.5s;
+        }
+        
+        .similar-ticket {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .similar-ticket h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .similar-ticket p {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .reasoning-list {
+            margin-top: 10px;
+        }
+        
+        .reasoning-list li {
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .back-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .explainability-note {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        
+        .explainability-note p {
+            color: #2e7d32;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        
+        .explainability-note strong {
+            color: #1b5e20;
+        }
+        
+        .category-scores {
+            margin-top: 10px;
+        }
+        
+        .category-score-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .category-score-label {
+            min-width: 120px;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .category-score-bar {
+            flex: 1;
+            background: #e0e0e0;
+            height: 20px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0 10px;
+        }
+        
+        .category-score-fill {
+            background: #667eea;
+            height: 100%;
+            transition: width 0.5s;
+        }
+        
+        .category-score-value {
+            min-width: 50px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if result.is_low_quality %}
+            <h1>⚠️ Ticket Flagged for Review</h1>
+            <p>Quality validation detected potential issues with this ticket</p>
+            {% elif result.auto_reply_enabled %}
+            <h1>🤖 Ticket Auto-Resolved by AI</h1>
+            <p>Your issue has been analyzed and a solution is provided below</p>
+            {% else %}
+            <h1>✅ AI Analysis Complete</h1>
+            <p>Your ticket has been analyzed and routed to the appropriate support team</p>
+            {% endif %}
+        </div>
+        
+        <div class="content">
+            {% if result.is_low_quality %}
+            <div class="success-banner" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe5a0 100%); border-left: 5px solid #ff9800;">
+                <h2>⚠️ Quality Review Required</h2>
+                <p>The AI detected potential issues with this ticket and has flagged it for manual review before assignment to a support team.</p>
+                <div style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 4px;">
+                    <strong>Issues Detected:</strong>
+                    <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                        {% for issue in result.quality_issues %}
+                        <li style="margin: 4px 0;">{{ issue }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.95em; color: #666;">
+                    <strong>Next Steps:</strong> A human reviewer will verify if this is a valid ticket. If valid, it will be reassigned to the appropriate team. If invalid (spam/gibberish), it will be rejected.
+                </p>
+            </div>
+            {% elif result.auto_reply_enabled %}
+            <div class="success-banner" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 5px solid #4caf50;">
+                <h2>🎯 Solution Provided - No Team Assignment Needed</h2>
+                <p>The AI found a highly similar ticket ({{ result.highest_similarity }} similarity) and generated an automatic response. Your ticket has been auto-resolved.</p>
+            </div>
+            {% else %}
+            <div class="success-banner">
+                <h2>🎯 Analysis Successful</h2>
+                <p>The AI pipeline (Model 2 → Model 1 → Model 3) has completed its analysis. Your ticket has been routed to the appropriate support team.</p>
+            </div>
+            {% endif %}
+            
+            <!-- Ticket Summary -->
+            <div class="section">
+                <div class="section-header">
+                    <h3><span class="icon">📋</span> Ticket Summary</h3>
+                </div>
+                <div class="section-content">
+                    <div class="info-row">
+                        <div class="info-label">Timestamp:</div>
+                        <div class="info-value">{{ result.timestamp }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Subject:</div>
+                        <div class="info-value"><strong>{{ result.subject }}</strong></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Description:</div>
+                        <div class="info-value">{{ result.description }}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model 2: Category Prediction -->
+            <div class="section">
+                <div class="section-header">
+                    <h3><span class="icon">🏷️</span> Model 2: Category Classification</h3>
+                </div>
+                <div class="section-content">
+                    <div class="info-row">
+                        <div class="info-label">Predicted Category:</div>
+                        <div class="info-value">
+                            <span class="badge badge-info">{{ result.predicted_category }}</span>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Confidence:</div>
+                        <div class="info-value">
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: {{ result.category_confidence }}">
+                                    {{ result.category_confidence }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Top Category Scores:</div>
+                        <div class="info-value">
+                            <div class="category-scores">
+                                {% for category, score in result.category_scores.items() %}
+                                <div class="category-score-item">
+                                    <div class="category-score-label">{{ category }}</div>
+                                    <div class="category-score-bar">
+                                        <div class="category-score-fill" style="width: {{ score }}"></div>
+                                    </div>
+                                    <div class="category-score-value">{{ score }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Method:</div>
+                        <div class="info-value">Zero-shot semantic similarity (no training required)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model 1: Duplicate Detection -->
+            <div class="section">
+                <div class="section-header">
+                    <h3><span class="icon">🔍</span> Model 1: Duplicate Detection</h3>
+                </div>
+                <div class="section-content">
+                    <div class="info-row">
+                        <div class="info-label">Status:</div>
+                        <div class="info-value">
+                            {% if result.is_duplicate %}
+                            <span class="badge badge-warning">Duplicate Detected</span>
+                            {% else %}
+                            <span class="badge badge-success">New Ticket</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Highest Similarity:</div>
+                        <div class="info-value">
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: {{ result.highest_similarity }}">
+                                    {{ result.highest_similarity }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Method:</div>
+                        <div class="info-value">Category-weighted cosine similarity</div>
+                    </div>
+                    
+                    {% if result.similar_tickets %}
+                    <div class="info-row">
+                        <div class="info-label">Top Similar Tickets:</div>
+                        <div class="info-value">
+                            {% for ticket in result.similar_tickets %}
+                            <div class="similar-ticket">
+                                <h4>Ticket #{{ ticket.ticket_id or 'N/A' }} - {{ ticket.category }}</h4>
+                                <p><strong>Subject:</strong> {{ ticket.subject or 'N/A' }}</p>
+                                <p><strong>Similarity:</strong> {{ (ticket.weighted_score * 100)|round(2) }}% (weighted)</p>
+                                <p><strong>Raw Similarity:</strong> {{ (ticket.raw_similarity * 100)|round(2) }}%</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Model 3: Priority Prediction -->
+            <div class="section">
+                <div class="section-header">
+                    <h3><span class="icon">⚡</span> Model 3: Priority Prediction</h3>
+                </div>
+                <div class="section-content">
+                    <div class="info-row">
+                        <div class="info-label">Suggested Priority:</div>
+                        <div class="info-value">
+                            <span class="badge badge-{{ result.suggested_priority|lower }}">{{ result.suggested_priority }}</span>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Confidence:</div>
+                        <div class="info-value">
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: {{ result.priority_confidence }}">
+                                    {{ result.priority_confidence }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Method:</div>
+                        <div class="info-value">Hybrid keyword analysis + category risk rules</div>
+                    </div>
+                    
+                    {% if result.priority_reasoning %}
+                    <div class="info-row">
+                        <div class="info-label">Reasoning:</div>
+                        <div class="info-value">
+                            <ul class="reasoning-list">
+                                {% for reason in result.priority_reasoning %}
+                                <li>{{ reason }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- AI Auto-Reply (if available) -->
+            {% if result.auto_reply and result.auto_reply.enabled %}
+            <div class="section" style="border-left: 4px solid #4caf50;">
+                <div class="section-header" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                    <h3><span class="icon">🤖</span> AI Auto-Reply Available</h3>
+                </div>
+                <div class="section-content" style="background: #f1f8f4;">
+                    <div style="background: #fff; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <div style="background: #4caf50; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em;">
+                                {{ result.auto_reply.confidence }} CONFIDENCE
+                            </div>
+                            <div style="margin-left: 15px; color: #666;">
+                                Similarity: {{ (result.auto_reply.similarity_score * 100)|round(2) }}%
+                            </div>
+                        </div>
+                        
+                        <h4 style="color: #2e7d32; margin: 15px 0 10px 0; font-size: 1.1em;">
+                            🎯 Suggested Solution:
+                        </h4>
+                        <p style="background: #e8f5e9; padding: 15px; border-radius: 4px; line-height: 1.6; margin: 10px 0;">
+                            {{ result.auto_reply.suggested_solution }}
+                        </p>
+                        
+                        <h4 style="color: #2e7d32; margin: 20px 0 10px 0; font-size: 1.1em;">
+                            📋 Recommended Next Steps:
+                        </h4>
+                        <ul style="list-style: none; padding: 0; margin: 10px 0;">
+                            {% for step in result.auto_reply.next_steps %}
+                            <li style="background: white; padding: 12px; margin: 8px 0; border-left: 3px solid #4caf50; border-radius: 4px;">
+                                <span style="color: #4caf50; margin-right: 8px;">✓</span>{{ step }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 12px; margin-top: 15px;">
+                            <strong style="color: #856404;">📌 Note:</strong>
+                            <span style="color: #856404;">
+                                This auto-reply is based on similar ticket 
+                                <strong>#{{ result.auto_reply.source_ticket_id }}</strong>. 
+                                Please verify the solution applies to your specific case.
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-row">
+                        <div class="info-label">Auto-Reply Status:</div>
+                        <div class="info-value">
+                            <span style="color: #4caf50; font-weight: bold;">✓ Enabled</span>
+                            <span style="color: #666; font-size: 0.9em; margin-left: 10px;">
+                                (Similarity ≥ 60%)
+                            </span>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Based On:</div>
+                        <div class="info-value">
+                            Ticket #{{ result.auto_reply.source_ticket_id }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% elif result.auto_reply == None or not result.auto_reply.enabled %}
+            <div class="section" style="border-left: 4px solid #9e9e9e;">
+                <div class="section-header" style="background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);">
+                    <h3><span class="icon">🤖</span> AI Auto-Reply</h3>
+                </div>
+                <div class="section-content">
+                    <div style="background: #fff9c4; border: 1px solid #fbc02d; border-radius: 4px; padding: 15px;">
+                        <p style="margin: 0; color: #f57f17;">
+                            <strong>⚠️ Auto-Reply Not Available</strong><br>
+                            <span style="font-size: 0.95em;">
+                                Similarity with historical tickets is below 60% threshold. 
+                                This ticket requires manual review by the support team.
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Routing Recommendation -->
+            {% if not result.auto_reply_enabled %}
+            <div class="section">
+                <div class="section-header">
+                    <h3><span class="icon">🎯</span> Team Assignment</h3>
+                </div>
+                <div class="section-content">
+                    <div class="info-row">
+                        <div class="info-label">✅ Your Ticket Will Be Handled By:</div>
+                        <div class="info-value">
+                            <div style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 10px 0; border-radius: 4px;">
+                                <h3 style="margin: 0 0 10px 0; color: #2e7d32; font-size: 1.3em;">
+                                    👥 {{ result.routing_team }}
+                                </h3>
+                                <p style="margin: 5px 0; color: #555;">
+                                    <strong>What they do:</strong> 
+                                    {% if 'Application' in result.routing_team %}
+                                        Resolve issues with business applications (Office 365, CRM, ERP, productivity tools)
+                                    {% elif 'Desktop' in result.routing_team %}
+                                        Fix hardware problems (laptops, monitors, peripherals, docking stations)
+                                    {% elif 'Network' in result.routing_team %}
+                                        Troubleshoot network connectivity (VPN, WiFi, LAN, DNS, firewalls)
+                                    {% elif 'Security' in result.routing_team %}
+                                        Handle security incidents (phishing, malware, unauthorized access, data breaches)
+                                    {% elif 'Database' in result.routing_team %}
+                                        Manage database issues (SQL errors, performance, access, backups)
+                                    {% elif 'DevOps' in result.routing_team %}
+                                        Support CI/CD pipelines, deployment issues, infrastructure automation
+                                    {% elif 'Cloud' in result.routing_team %}
+                                        Resolve cloud platform issues (AWS, Azure, GCP, SaaS applications)
+                                    {% elif 'Identity' in result.routing_team %}
+                                        Handle login problems, password resets, account permissions, access requests
+                                    {% elif 'Facilities' in result.routing_team %}
+                                        Manage workspace issues (AC, lighting, furniture, office equipment)
+                                    {% else %}
+                                        General IT support for all technology-related issues
+                                    {% endif %}
+                                </p>
+                                <p style="margin: 10px 0 5px 0; color: #666; font-size: 0.9em;">
+                                    📞 <strong>Expected Response Time:</strong> 
+                                    {% if result.suggested_priority == 'Critical' %}
+                                        15 minutes (Critical priority)
+                                    {% elif result.suggested_priority == 'High' %}
+                                        1 hour (High priority)
+                                    {% elif result.suggested_priority == 'Medium' %}
+                                        4 hours (Medium priority)
+                                    {% else %}
+                                        8 hours (Low priority)
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Routing Method:</div>
+                        <div class="info-value">AI-based category detection + rule-based team assignment</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Ticket ID:</div>
+                        <div class="info-value"><strong style="color: #1976d2; font-family: monospace; font-size: 1.1em;">{{ result.timestamp.replace(':', '').replace('-', '').replace(' ', '-') }}</strong></div>
+                    </div>
+                </div>
+            </div>
+            {% elif result.is_low_quality %}
+            <!-- Low-Quality Ticket Status -->
+            <div class="section" style="border-left: 4px solid #ff9800;">
+                <div class="section-header" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe5a0 100%);">
+                    <h3><span class="icon">⚠️</span> Ticket Status</h3>
+                </div>
+                <div class="section-content">
+                    <div style="background: #fff3cd; border: 2px solid #ff9800; border-radius: 8px; padding: 20px; text-align: center;">
+                        <h2 style="color: #f57c00; margin: 0 0 15px 0; font-size: 1.5em;">
+                            ⚠️ PENDING QUALITY REVIEW
+                        </h2>
+                        <p style="color: #555; font-size: 1.1em; margin: 10px 0;">
+                            <strong>Status:</strong> {{ result.ticket_status }}
+                        </p>
+                        <p style="color: #666; font-size: 0.95em; margin: 15px 0;">
+                            This ticket has been flagged for manual verification before assignment to a support team.
+                        </p>
+                        <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 15px;">
+                            <p style="margin: 0 0 10px 0; color: #444;">
+                                <strong>⚠️ Quality Issues Detected:</strong>
+                            </p>
+                            <ul style="text-align: left; margin: 0; padding-left: 20px; color: #666;">
+                                {% for issue in result.quality_issues %}
+                                <li style="margin: 5px 0;">{{ issue }}</li>
+                                {% endfor %}
+                            </ul>
+                            <p style="margin: 15px 0 0 0; color: #444; font-size: 0.9em;">
+                                <strong>Next Steps:</strong><br>
+                                • Human reviewer will verify ticket validity<br>
+                                • If valid: Reassigned to appropriate team<br>
+                                • If invalid: Rejected as spam/gibberish
+                            </p>
+                        </div>
+                    </div>
+                    <div class="info-row" style="margin-top: 15px;">
+                        <div class="info-label">Ticket ID:</div>
+                        <div class="info-value"><strong style="color: #1976d2; font-family: monospace; font-size: 1.1em;">{{ result.timestamp.replace(':', '').replace('-', '').replace(' ', '-') }}</strong></div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <!-- Auto-Resolved Status (No Team Assignment) -->
+            <div class="section" style="border-left: 4px solid #4caf50;">
+                <div class="section-header" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                    <h3><span class="icon">✅</span> Ticket Status</h3>
+                </div>
+                <div class="section-content">
+                    <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; text-align: center;">
+                        <h2 style="color: #2e7d32; margin: 0 0 15px 0; font-size: 1.5em;">
+                            ✅ TICKET AUTO-RESOLVED
+                        </h2>
+                        <p style="color: #555; font-size: 1.1em; margin: 10px 0;">
+                            <strong>Status:</strong> {{ result.ticket_status }}
+                        </p>
+                        <p style="color: #666; font-size: 0.95em; margin: 15px 0;">
+                            No manual team assignment needed. The AI has provided a solution based on a highly similar historical ticket.
+                        </p>
+                        <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 15px;">
+                            <p style="margin: 0; color: #444;">
+                                <strong>🎯 Response Time:</strong> {{ result.expected_response }}<br>
+                                <strong>📌 Resolved By:</strong> AI Auto-Resolution System<br>
+                                <strong>🔍 Confidence:</strong> {{ result.auto_reply.confidence }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="info-row" style="margin-top: 15px;">
+                        <div class="info-label">Ticket ID:</div>
+                        <div class="info-value"><strong style="color: #1976d2; font-family: monospace; font-size: 1.1em;">{{ result.timestamp.replace(':', '').replace('-', '').replace(' ', '-') }}</strong></div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Explainability Note -->
+            <div class="explainability-note">
+                {% if result.is_low_quality %}
+                <p><strong>🔍 Full Transparency Guarantee:</strong></p>
+                <p><strong>Your ticket was flagged for quality review.</strong> The AI detected potential issues that may indicate invalid or incomplete information. Check your terminal to see the complete quality check reasoning and what specific issues were detected.</p>
+                {% elif result.auto_reply_enabled %}
+                <p><strong>🔍 Full Transparency Guarantee:</strong></p>
+                <p><strong>Your ticket was automatically resolved by AI.</strong> The solution is based on a similar historical ticket with {{ result.highest_similarity }} similarity. Check your terminal to see the complete step-by-step AI reasoning, including how the solution was determined.</p>
+                {% else %}
+                <p><strong>🔍 Full Transparency Guarantee:</strong></p>
+                <p>{{ result.explainability_note }}</p>
+                <p><strong>Check your terminal to see the complete step-by-step AI reasoning!</strong></p>
+                <p>Every decision (category, duplicate detection, priority) is logged with full explanation.</p>
+                {% endif %}
+            </div>
+            
+            <!-- Back Button -->
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="/" class="back-btn">← Submit Another Ticket</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

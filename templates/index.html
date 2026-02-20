@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Helpdesk - AI Ticket Submission</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .form-container {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .required {
+            color: #e74c3c;
+        }
+        
+        select, input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .warning-box strong {
+            color: #856404;
+        }
+        
+        .warning-box p {
+            color: #856404;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        
+        .ai-info {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        
+        .ai-info h3 {
+            color: #2e7d32;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .ai-info ul {
+            margin-left: 20px;
+            color: #2e7d32;
+            font-size: 13px;
+        }
+        
+        .ai-info ul li {
+            margin-bottom: 5px;
+        }
+        
+        .saved-tickets-section {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .saved-tickets-section h3 {
+            color: #1976d2;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .quick-fill-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .quick-btn {
+            background: white;
+            border: 2px solid #2196f3;
+            color: #1976d2;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        
+        .quick-btn:hover {
+            background: #2196f3;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+        }
+        
+        .quick-btn-icon {
+            margin-right: 5px;
+        }
+        
+        .saved-dropdown-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .saved-dropdown {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #2196f3;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .clear-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .clear-btn:hover {
+            background: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Smart Helpdesk AI</h1>
+            <p>Explainable AI-Powered Ticket Analysis System</p>
+            <span class="badge">✓ Transparent | ✓ Explainable | ✓ Deterministic</span>
+        </div>
+        
+        <div class="form-container">
+            <div class="ai-info">
+                <h3>🔍 How AI Will Analyze Your Ticket:</h3>
+                <ul>
+                    <li><strong>Model 2:</strong> Predicts ticket category using zero-shot classification</li>
+                    <li><strong>Model 1:</strong> Detects duplicate tickets using semantic similarity</li>
+                    <li><strong>Model 3:</strong> Suggests priority based on impact analysis</li>
+                </ul>
+            </div>
+            
+            <!-- Quick Fill & Saved Tickets Section -->
+            <div class="saved-tickets-section">
+                <h3>⚡ Quick Fill - Test Scenarios</h3>
+                <div class="quick-fill-buttons">
+                    <button type="button" class="quick-btn" onclick="loadTestTicket('vpn')">
+                        <span class="quick-btn-icon">🌐</span> VPN Disconnect (High Similarity)
+                    </button>
+                    <button type="button" class="quick-btn" onclick="loadTestTicket('github')">
+                        <span class="quick-btn-icon">🔑</span> GitHub Access (Medium)
+                    </button>
+                    <button type="button" class="quick-btn" onclick="loadTestTicket('security')">
+                        <span class="quick-btn-icon">🔒</span> Security Phishing Alert
+                    </button>
+                    <button type="button" class="quick-btn" onclick="loadTestTicket('coffee')">
+                        <span class="quick-btn-icon">☕</span> Coffee Machine (Low Similarity)
+                    </button>
+                    <button type="button" class="quick-btn" onclick="loadTestTicket('outlook')">
+                        <span class="quick-btn-icon">📧</span> Outlook Crash (Software)
+                    </button>
+                    <button type="button" class="quick-btn" onclick="loadTestTicket('laptop')">
+                        <span class="quick-btn-icon">💻</span> Laptop Overheating
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 15px;">📋 Load Previously Submitted Tickets</h3>
+                <div class="saved-dropdown-row">
+                    <select id="saved-tickets-dropdown" class="saved-dropdown" onchange="loadSavedTicket()">
+                        <option value="">-- Select a saved ticket --</option>
+                    </select>
+                    <button type="button" class="clear-btn" onclick="clearAllSavedTickets()">🗑️ Clear All</button>
+                </div>
+            </div>
+            
+            <div class="warning-box">
+                <strong>⚠️ Important:</strong>
+                <p>The category you select below is ONLY for UI context. The AI will independently classify your ticket based on semantic analysis.</p>
+            </div>
+            
+            <form action="/submit-ticket" method="POST" onsubmit="return validateForm()">
+                <!-- Issue Context -->
+                <div class="form-group">
+                    <label for="context">Issue Context <span class="required">*</span></label>
+                    <select name="context" id="context" required onchange="updateSubtypeOptions()">
+                        <option value="">-- Select Issue Type --</option>
+                        <option value="Software / Application">Software / Application</option>
+                        <option value="Hardware / Device">Hardware / Device</option>
+                        <option value="Network / VPN">Network / VPN</option>
+                        <option value="Access / Permission">Access / Permission</option>
+                        <option value="Facilities">Facilities</option>
+                        <option value="Environment">Environment</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <div class="info-text">This helps provide context but does NOT override AI classification</div>
+                </div>
+                
+                <!-- Conditional Subtype -->
+                <div class="form-group" id="subtype-group" style="display: none;">
+                    <label for="subtype" id="subtype-label">Subtype</label>
+                    <select name="subtype" id="subtype-select" style="display: none;">
+                        <option value="">-- Select --</option>
+                    </select>
+                    <input type="text" name="subtype" id="subtype-text" placeholder="Please specify" style="display: none;">
+                </div>
+                
+                <!-- Subject -->
+                <div class="form-group">
+                    <label for="subject">Subject <span class="required">*</span></label>
+                    <input type="text" 
+                           name="subject" 
+                           id="subject" 
+                           placeholder="Brief description of the issue"
+                           required
+                           minlength="10">
+                    <div class="info-text">Minimum 10 characters</div>
+                </div>
+                
+                <!-- Description -->
+                <div class="form-group">
+                    <label for="description">Description <span class="required">*</span></label>
+                    <textarea name="description" 
+                              id="description" 
+                              placeholder="Detailed description of the issue. Include what happened, when it started, and any error messages."
+                              required
+                              minlength="20"></textarea>
+                    <div class="info-text">Minimum 20 characters. Be specific for better AI analysis.</div>
+                </div>
+                
+                <!-- Submit Button -->
+                <button type="submit" class="submit-btn">
+                    🚀 Submit Ticket & Analyze with AI
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function updateSubtypeOptions() {
+            const context = document.getElementById('context').value;
+            const subtypeGroup = document.getElementById('subtype-group');
+            const subtypeSelect = document.getElementById('subtype-select');
+            const subtypeText = document.getElementById('subtype-text');
+            const subtypeLabel = document.getElementById('subtype-label');
+            
+            // Reset
+            subtypeSelect.style.display = 'none';
+            subtypeText.style.display = 'none';
+            subtypeSelect.innerHTML = '<option value="">-- Select --</option>';
+            
+            if (context === 'Hardware / Device') {
+                subtypeLabel.textContent = 'Device Type';
+                const options = ['Laptop', 'Desktop', 'Keyboard', 'Mouse', 'Monitor', 'Docking Station', 'Other'];
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    subtypeSelect.appendChild(option);
+                });
+                subtypeSelect.style.display = 'block';
+                subtypeGroup.style.display = 'block';
+            } 
+            else if (context === 'Software / Application') {
+                subtypeLabel.textContent = 'Application Name';
+                subtypeText.placeholder = 'Enter application name (e.g., Outlook, Chrome, Slack)';
+                subtypeText.style.display = 'block';
+                subtypeGroup.style.display = 'block';
+            }
+            else if (context === 'Network / VPN') {
+                subtypeLabel.textContent = 'Network Type';
+                const options = ['VPN', 'WiFi', 'LAN', 'DNS', 'Other'];
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    subtypeSelect.appendChild(option);
+                });
+                subtypeSelect.style.display = 'block';
+                subtypeGroup.style.display = 'block';
+            }
+            else if (context === 'Other') {
+                subtypeLabel.textContent = 'Specify Type';
+                subtypeText.placeholder = 'Please specify the type of issue';
+                subtypeText.style.display = 'block';
+                subtypeGroup.style.display = 'block';
+            }
+            else {
+                subtypeGroup.style.display = 'none';
+            }
+        }
+        
+        function validateForm() {
+            const subject = document.getElementById('subject').value;
+            const description = document.getElementById('description').value;
+            
+            if (subject.length < 10) {
+                alert('Subject must be at least 10 characters long.');
+                return false;
+            }
+            
+            if (description.length < 20) {
+                alert('Description must be at least 20 characters long.');
+                return false;
+            }
+            
+            // Save form data to localStorage before submitting
+            saveFormData();
+            
+            return true;
+        }
+        
+        // ====================================================
+        // SAVE/LOAD FUNCTIONALITY
+        // ====================================================
+        
+        function saveFormData() {
+            const formData = {
+                context: document.getElementById('context').value,
+                subject: document.getElementById('subject').value,
+                description: document.getElementById('description').value,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            // Get existing tickets from localStorage
+            let savedTickets = JSON.parse(localStorage.getItem('savedTickets') || '[]');
+            
+            // Add new ticket (keep last 10)
+            savedTickets.unshift(formData);
+            if (savedTickets.length > 10) {
+                savedTickets = savedTickets.slice(0, 10);
+            }
+            
+            // Save back to localStorage
+            localStorage.setItem('savedTickets', JSON.stringify(savedTickets));
+        }
+        
+        function loadSavedTicket() {
+            const dropdown = document.getElementById('saved-tickets-dropdown');
+            const selectedIndex = dropdown.value;
+            
+            if (!selectedIndex) return;
+            
+            const savedTickets = JSON.parse(localStorage.getItem('savedTickets') || '[]');
+            const ticket = savedTickets[selectedIndex];
+            
+            if (ticket) {
+                document.getElementById('context').value = ticket.context;
+                document.getElementById('subject').value = ticket.subject;
+                document.getElementById('description').value = ticket.description;
+                
+                // Trigger context change to update subtype
+                updateSubtypeOptions();
+                
+                // Scroll to form
+                document.getElementById('subject').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        function populateSavedTicketsDropdown() {
+            const dropdown = document.getElementById('saved-tickets-dropdown');
+            const savedTickets = JSON.parse(localStorage.getItem('savedTickets') || '[]');
+            
+            // Clear existing options except first one
+            dropdown.innerHTML = '<option value="">-- Select a saved ticket --</option>';
+            
+            // Add saved tickets
+            savedTickets.forEach((ticket, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${ticket.subject.substring(0, 50)}... (${ticket.timestamp})`;
+                dropdown.appendChild(option);
+            });
+        }
+        
+        function clearAllSavedTickets() {
+            if (confirm('Are you sure you want to clear all saved tickets?')) {
+                localStorage.removeItem('savedTickets');
+                populateSavedTicketsDropdown();
+                alert('All saved tickets have been cleared!');
+            }
+        }
+        
+        // ====================================================
+        // QUICK FILL TEST SCENARIOS
+        // ====================================================
+        
+        function loadTestTicket(type) {
+            const testTickets = {
+                'vpn': {
+                    context: 'Network / VPN',
+                    subtype: 'VPN',
+                    subject: 'VPN disconnects every 30 minutes',
+                    description: 'My corporate VPN connection drops every half hour when working from home. I have to re-authenticate each time. Using Cisco AnyConnect client on Windows 11. This has been happening for the past 3 days.'
+                },
+                'github': {
+                    context: 'Access / Permission',
+                    subtype: '',
+                    subject: 'Need GitHub Enterprise access',
+                    description: 'Just joined the backend development team and need access to GitHub Enterprise organization. Manager is Sarah Chen. Need read/write access to api-services and data-pipeline repositories for my project work.'
+                },
+                'security': {
+                    context: 'Software / Application',
+                    subtype: 'Email',
+                    subject: 'Suspicious email asking for password reset',
+                    description: 'I received an email claiming to be from IT asking me to click a link and enter my credentials. The link looks suspicious: http://compamy-login.tk. I did not click it. Is this a phishing attempt? I want to report this security concern.'
+                },
+                'coffee': {
+                    context: 'Facilities',
+                    subtype: '',
+                    subject: 'Coffee machine not working on 3rd floor',
+                    description: 'The office coffee machine in the break room is not dispensing coffee. Display shows error code E-04. This has been broken since yesterday morning and is affecting team morale. Please send someone to fix or replace it.'
+                },
+                'outlook': {
+                    context: 'Software / Application',
+                    subtype: 'Outlook',
+                    subject: 'Outlook keeps crashing when opening attachments',
+                    description: 'Microsoft Outlook crashes every time I try to open PDF attachments. Error message says "Outlook has stopped working". I have tried restarting the application and my computer but the problem persists. This is blocking my work.'
+                },
+                'laptop': {
+                    context: 'Hardware / Device',
+                    subtype: 'Laptop',
+                    subject: 'Laptop overheating during video calls',
+                    description: 'My work laptop gets extremely hot during Microsoft Teams video calls. Fans run at maximum speed and the bottom of the laptop is too hot to touch. Sometimes it shuts down unexpectedly. This started after the latest Windows update.'
+                }
+            };
+            
+            const ticket = testTickets[type];
+            if (ticket) {
+                document.getElementById('context').value = ticket.context;
+                updateSubtypeOptions();
+                
+                // Set subtype after a brief delay to ensure subtype fields are rendered
+                setTimeout(() => {
+                    const subtypeSelect = document.getElementById('subtype-select');
+                    const subtypeText = document.getElementById('subtype-text');
+                    
+                    if (subtypeSelect.style.display !== 'none' && ticket.subtype) {
+                        subtypeSelect.value = ticket.subtype;
+                    }
+                    if (subtypeText.style.display !== 'none' && ticket.subtype) {
+                        subtypeText.value = ticket.subtype;
+                    }
+                }, 100);
+                
+                document.getElementById('subject').value = ticket.subject;
+                document.getElementById('description').value = ticket.description;
+                
+                // Scroll to subject field
+                document.getElementById('subject').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        // ====================================================
+        // INITIALIZE ON PAGE LOAD
+        // ====================================================
+        
+        // Populate saved tickets dropdown on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            populateSavedTicketsDropdown();
+        });
+    </script>
+</body>
+</html>
