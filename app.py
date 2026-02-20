@@ -356,8 +356,8 @@ def submit_ticket():
         source_description = auto_reply_source_ticket.get('description', '')
         
         # Rephrase solution based on current ticket's specific situation
-        current_subject_lower = ticket_subject.lower()
-        current_desc_lower = ticket_description.lower()
+        current_subject_lower = subject.lower()
+        current_desc_lower = description.lower()
         
         # Extract key context from current ticket for personalized rephrasing
         is_vpn_issue = any(kw in current_subject_lower or kw in current_desc_lower 
