@@ -797,6 +797,7 @@ def submit_ticket():
         'duplicate_status': 'Duplicate Ticket' if is_duplicate else 'New Ticket',
         'highest_similarity': f"{highest_similarity*100:.2f}%",
         'similar_tickets': similar_tickets[:3],  # Top 3 for display
+        'similar_ticket_count_60_plus': auto_reply_candidate_count,  # Count of tickets with 60%+ similarity
         
         # Auto-Reply Feature
         'auto_reply': auto_reply_message,

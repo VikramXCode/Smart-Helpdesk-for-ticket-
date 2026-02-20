@@ -419,6 +419,21 @@
                         </div>
                     </div>
                     <div class="info-row">
+                        <div class="info-label">Tickets Above 60%:</div>
+                        <div class="info-value">
+                            <span style="font-weight: bold; color: {{ '#4caf50' if result.similar_ticket_count_60_plus >= 10 else '#ff9800' if result.similar_ticket_count_60_plus > 0 else '#f44336' }};">
+                                {{ result.similar_ticket_count_60_plus }} ticket(s)
+                            </span>
+                            {% if result.similar_ticket_count_60_plus >= 10 %}
+                            <span style="color: #4caf50; margin-left: 10px;">✓ Auto-reply threshold met</span>
+                            {% elif result.similar_ticket_count_60_plus > 0 %}
+                            <span style="color: #ff9800; margin-left: 10px;">⚠ Need {{ 10 - result.similar_ticket_count_60_plus }} more for auto-reply</span>
+                            {% else %}
+                            <span style="color: #666; margin-left: 10px;">Unique ticket - manual review</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-row">
                         <div class="info-label">Method:</div>
                         <div class="info-value">Category-weighted cosine similarity</div>
                     </div>
@@ -491,12 +506,15 @@
                 </div>
                 <div class="section-content" style="background: #f1f8f4;">
                     <div style="background: #fff; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
-                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 15px; gap: 15px;">
                             <div style="background: #4caf50; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em;">
                                 {{ result.auto_reply.confidence }} CONFIDENCE
                             </div>
-                            <div style="margin-left: 15px; color: #666;">
-                                Similarity: {{ (result.auto_reply.similarity_score * 100)|round(2) }}%
+                            <div style="color: #666;">
+                                Best Match: {{ (result.auto_reply.similarity_score * 100)|round(2) }}%
+                            </div>
+                            <div style="background: #e3f2fd; color: #1976d2; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9em;">
+                                📊 {{ result.auto_reply.similar_ticket_count }} similar tickets found (60%+ similarity)
                             </div>
                         </div>
                         
