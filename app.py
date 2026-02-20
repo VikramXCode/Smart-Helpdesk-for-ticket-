@@ -327,8 +327,8 @@ def submit_ticket():
     auto_reply_message = None
     auto_reply_source_ticket = None
     
-    # Count how many tickets meet auto-reply threshold (60%+ similarity)
-    auto_reply_candidate_count = sum(1 for t in similar_tickets if t.get('similarity', 0) >= AUTO_REPLY_THRESHOLD)
+    # Count how many tickets meet auto-reply threshold (60%+ weighted similarity)
+    auto_reply_candidate_count = sum(1 for t in similar_tickets if t.get('weighted_score', 0) >= AUTO_REPLY_THRESHOLD)
     
     # Auto-reply only if 10 or more similar tickets exist
     if auto_reply_candidate_count >= 10 and len(similar_tickets) > 0:
