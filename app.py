@@ -1,10 +1,10 @@
 """
-Flask Web Application: Explainable AI Ticket Analysis
-======================================================
+FastAPI Web Application: Explainable AI Ticket Analysis
+========================================================
 Enterprise-grade transparent AI helpdesk system.
 
 Architecture:
-    Frontend (HTML) → Flask Backend → Model 2 → Model 1 → Model 3
+    Frontend (HTML) → FastAPI Backend → Model 2 → Model 1 → Model 3
     
 Transparency Guarantee:
     - Every AI decision is logged to terminal
@@ -27,7 +27,10 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # ====================================================
 # IMPORTS
 # ====================================================
-from flask import Flask, render_template, request, jsonify
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 import sys
 
@@ -56,9 +59,15 @@ except LookupError:
     from nltk.corpus import words
 
 # ====================================================
-# FLASK APP INITIALIZATION
+# FASTAPI APP INITIALIZATION
 # ====================================================
-app = Flask(__name__)
+app = FastAPI(title="Smart Helpdesk AI", version="2.0", description="Explainable AI Ticket Analysis System")
+
+# Setup Jinja2 templates
+templates = Jinja2Templates(directory="templates")
+
+# Mount static files (if needed for CSS/JS)
+# app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ====================================================
 # AI PIPELINE INITIALIZATION (LOAD MODELS ONCE)
@@ -149,14 +158,18 @@ CATEGORY_ROUTING = {
 # ROUTES
 # ====================================================
 
-@app.route('/')
-def index():
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
     """Render the ticket submission form."""
-    return render_template('index.html')
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.route('/submit-ticket', methods=['POST'])
-def submit_ticket():
+@app.post("/submit-ticket", response_class=HTMLResponse)
+async def submit_ticket(
+    request: Request,
+    subject: str = Form(...),
+    description: str = Form(...)
+):
     """
     Process ticket submission through full AI pipeline.
     Prints detailed reasoning to terminal.
@@ -173,9 +186,11 @@ def submit_ticket():
     if not ai_enabled:
         print("[FALLBACK MODE] AI models not available")
         print("[FALLBACK MODE] Using rule-based routing")
-        return render_template('error.html', 
-            error_message="AI system is currently unavailable. Please try again later or contact support.",
-            fallback_mode=True)
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error_message": "AI system is currently unavailable. Please try again later or contact support.",
+            "fallback_mode": True
+        })
     
     # ====================================================
     # STEP 0: INPUT NORMALIZATION
@@ -183,9 +198,7 @@ def submit_ticket():
     print("[STEP 0] INPUT NORMALIZATION")
     print("-" * 70)
     
-    # Extract form data (only subject and description)
-    subject = request.form.get('subject', '')
-    description = request.form.get('description', '')
+    # Form data already extracted from Form parameters (subject, description)
     
     print(f"[INFO] Ticket received from web UI")
     print(f"[INFO] Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -882,16 +895,18 @@ def submit_ticket():
         'explainability_note': 'This decision is AI-assisted and fully explainable. See terminal logs for complete reasoning.'
     }
     
-    return render_template('result.html', result=result)
+    return templates.TemplateResponse("result.html", {"request": request, "result": result})
 
 
 # ====================================================
 # MAIN EXECUTION
 # ====================================================
 if __name__ == '__main__':
-    print("\n[FLASK] Starting web server...")
-    print("[FLASK] Server will be available at: http://127.0.0.1:5000")
-    print("[FLASK] Press Ctrl+C to stop")
+    import uvicorn
+    
+    print("\n[FASTAPI] Starting web server with Uvicorn...")
+    print("[FASTAPI] Server will be available at: http://127.0.0.1:8000")
+    print("[FASTAPI] Press Ctrl+C to stop")
     print()
     
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
