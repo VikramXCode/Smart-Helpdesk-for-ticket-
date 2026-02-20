@@ -1,0 +1,11 @@
+ticket_id,tenant_id,category,subject,description,status,priority
+ACME-001,acme_corp,Network,VPN connection fails,Cannot connect to company VPN from remote location. Getting authentication error.,Open,High
+ACME-002,acme_corp,Payment,Credit card processing slow,Payment gateway responding slowly. Customers experiencing 10+ second delays.,Open,Critical
+ACME-003,acme_corp,Login,Password reset broken,Password reset emails not arriving. Checked spam folders.,Open,Medium
+ACME-004,acme_corp,Network,WiFi drops frequently,Office WiFi disconnects every 20 minutes in east wing.,Open,Medium
+ACME-005,acme_corp,Performance,Dashboard loads slowly,Main analytics dashboard takes 3+ minutes to load.,Open,High
+ACME-006,acme_corp,Login,Cannot access admin panel,Admin login shows 403 forbidden error.,Open,Critical
+ACME-007,acme_corp,Network,Email server down,Cannot send or receive emails. Server not responding.,Resolved,Critical
+ACME-008,acme_corp,Payment,Refund processing error,Automated refunds failing with error code 500.,Open,High
+ACME-009,acme_corp,Performance,Database queries slow,Report generation timing out after 60 seconds.,Open,High
+ACME-010,acme_corp,Login,Two-factor auth not working,2FA codes showing as invalid even when correct.,Open,Medium

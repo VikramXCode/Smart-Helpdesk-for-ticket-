@@ -1,0 +1,9 @@
+ticket_id,tenant_id,category,subject,description,status,priority
+GLX-001,globex_inc,Messaging,Chat app crashes,Mobile chat application crashes on startup after latest update.,Open,High
+GLX-002,globex_inc,Network,VPN authentication issue,Remote VPN keeps asking for credentials even after successful login.,Open,Medium
+GLX-003,globex_inc,Performance,Website loading slow,Company website taking 5+ seconds to load homepage.,Open,Critical
+GLX-004,globex_inc,Messaging,File upload fails,Cannot upload files larger than 5MB in team chat.,Open,Medium
+GLX-005,globex_inc,Login,Single sign-on broken,SSO redirect fails with invalid token error.,Open,Critical
+GLX-006,globex_inc,Network,Firewall blocking access,New firewall rules blocking access to cloud storage.,Open,High
+GLX-007,globex_inc,Messaging,Notifications delayed,Push notifications arriving 30+ minutes late.,Resolved,Medium
+GLX-008,globex_inc,Performance,API response slow,REST API endpoints responding in 3-4 seconds instead of <500ms.,Open,High

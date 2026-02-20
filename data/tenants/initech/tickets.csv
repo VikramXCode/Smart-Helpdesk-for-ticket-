@@ -1,0 +1,11 @@
+ticket_id,tenant_id,category,subject,description,status,priority
+INIT-001,initech,Payment,Payment gateway timeout,Checkout page timing out during payment processing.,Open,Critical
+INIT-002,initech,Login,Account locked out,Multiple employees locked out after password policy change.,Open,High
+INIT-003,initech,Network,Cannot connect to VPN,VPN client shows connection timeout error.,Open,High
+INIT-004,initech,Performance,Application freezes,CRM application freezes when loading large customer lists.,Open,Medium
+INIT-005,initech,Payment,Invoice generation failed,Automated monthly invoices not being generated.,Open,Critical
+INIT-006,initech,Login,Password complexity error,New password policy rejecting valid strong passwords.,Resolved,Medium
+INIT-007,initech,Network,DNS resolution failing,Internal domains not resolving correctly.,Open,High
+INIT-008,initech,Performance,Server high CPU usage,Production server CPU at 95% constantly.,Open,Critical
+INIT-009,initech,Payment,Duplicate charges,Some transactions being charged twice to customer cards.,Open,Critical
+INIT-010,initech,Login,MFA setup broken,Multi-factor authentication setup wizard not loading.,Open,Medium
