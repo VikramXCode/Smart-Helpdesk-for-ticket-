@@ -12,6 +12,7 @@ export const AdminLayout = ({ children, title, headerAction }) => {
   const isSuperAdmin = role === 'super_admin';
   const isCompanyAdmin = role === 'company_admin';
   const isItStaff = role === 'it_staff';
+  const isEmployee = role === 'employee';
 
   const dashboardLink = isSuperAdmin
     ? '/super-admin'
@@ -28,6 +29,7 @@ export const AdminLayout = ({ children, title, headerAction }) => {
       : 'Dashboard';
 
   const showTicketsLink = isCompanyAdmin;
+  const showKnowledgeLink = false;
 
   const handleLogout = () => {
     logout();
@@ -60,14 +62,70 @@ export const AdminLayout = ({ children, title, headerAction }) => {
             <Link to={dashboardLink} onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
               <span className="material-symbols-outlined">dashboard</span><span className="text-sm font-medium">{dashboardLabel}</span>
             </Link>
+            {isSuperAdmin && (
+              <>
+                <Link to="/super-admin/platform-metrics" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">monitoring</span><span className="text-sm font-medium">Platform Metrics</span>
+                </Link>
+                <Link to="/super-admin/tenants" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">apartment</span><span className="text-sm font-medium">Tenant Management</span>
+                </Link>
+                <Link to="/super-admin/onboard" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">add_business</span><span className="text-sm font-medium">Onboard Tenant</span>
+                </Link>
+                <Link to="/super-admin/issues" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">forum</span><span className="text-sm font-medium">Issue Inbox</span>
+                </Link>
+              </>
+            )}
             {showTicketsLink && (
               <Link to="/staff/tickets" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
                 <span className="material-symbols-outlined">confirmation_number</span><span className="text-sm font-medium">Tickets</span>
               </Link>
             )}
-            <Link to="/knowledge" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
-              <span className="material-symbols-outlined">book</span><span className="text-sm font-medium">Knowledge Base</span>
-            </Link>
+            {isItStaff && (
+              <>
+                <Link to="/staff/tickets/urgent" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">priority_high</span><span className="text-sm font-medium">Urgent Queue</span>
+                </Link>
+                <Link to="/staff/tickets/in-progress" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">timelapse</span><span className="text-sm font-medium">In Progress</span>
+                </Link>
+                <Link to="/staff/tickets/resolved" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">task_alt</span><span className="text-sm font-medium">Resolved</span>
+                </Link>
+              </>
+            )}
+            {isEmployee && (
+              <>
+                <Link to="/dashboard/open" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">pending_actions</span><span className="text-sm font-medium">Open Tickets</span>
+                </Link>
+                <Link to="/dashboard/resolved" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                  <span className="material-symbols-outlined">task_alt</span><span className="text-sm font-medium">Resolved Tickets</span>
+                </Link>
+              </>
+            )}
+            {isCompanyAdmin && (
+              <Link to="/admin/team-management" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                <span className="material-symbols-outlined">groups</span><span className="text-sm font-medium">Team Management</span>
+              </Link>
+            )}
+            {isCompanyAdmin && (
+              <Link to="/admin/employees" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                <span className="material-symbols-outlined">badge</span><span className="text-sm font-medium">Employees</span>
+              </Link>
+            )}
+            {isCompanyAdmin && (
+              <Link to="/admin/issues" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                <span className="material-symbols-outlined">forum</span><span className="text-sm font-medium">Issues</span>
+              </Link>
+            )}
+            {showKnowledgeLink && (
+              <Link to="/knowledge" onClick={() => setShowMobileSidebar(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                <span className="material-symbols-outlined">book</span><span className="text-sm font-medium">Knowledge Base</span>
+              </Link>
+            )}
             <div className="my-4 border-t border-slate-100 dark:border-slate-700"></div>
             <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors w-full text-left">
               <span className="material-symbols-outlined">logout</span><span className="text-sm font-medium">Sign Out</span>

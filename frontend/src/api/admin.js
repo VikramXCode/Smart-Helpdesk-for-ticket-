@@ -57,3 +57,9 @@ export const getNotifications = () =>
 
 export const updateNotifications = (data) =>
   USE_MOCK_DATA ? mockUpdateNotifications(data) : api.put('/admin/notifications', data);
+
+export const bulkCreateEmployees = (emails) =>
+  api.post('/admin/employees/bulk-create', { emails });
+
+export const createEmployee = (data) =>
+  api.post('/admin/employees', data);

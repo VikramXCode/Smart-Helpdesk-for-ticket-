@@ -13,6 +13,7 @@ Endpoints:
 - GET    /tickets/:id/similar-articles  Vector search for related articles
 - GET    /tickets/:id/ai-suggestion     Get AI suggestion for ticket
 """
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -23,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB, require_it_staff
-from app.models import AuditLog, Ticket, TicketMessage, User
+from app.models import AuditLog, Team, Ticket, TicketMessage, User
 from app.schemas import (
     AISuggestionOut,
     AssignedTeamOut,
@@ -40,10 +41,15 @@ from app.schemas import (
 )
 from app.services import ai
 from app.services.ai_client import analyze_ticket_with_ai
+from app.services.notifications import notify_ticket_routed
 from app.services.vector import find_similar_articles
 from app.utils.exceptions import ForbiddenError, NotFoundError
+from app.config import settings
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+logger = logging.getLogger(__name__)
+FALLBACK_CATEGORY = "Others"
+FALLBACK_TEAM = "Others"
 
 
 def _relative_time(dt: Optional[datetime]) -> str:
@@ -84,6 +90,50 @@ def _format_message_time(dt: datetime) -> str:
     return dt.strftime("%b %d, %I:%M %p")
 
 
+async def _pick_assignee_for_team(
+    db: AsyncSession,
+    company_id: uuid.UUID,
+    team_name: Optional[str],
+) -> Optional[User]:
+    """Pick the least-loaded IT staff member from the routed team."""
+    if not team_name:
+        return None
+
+    team_result = await db.execute(
+        select(Team).where(Team.company_id == company_id, Team.name == team_name)
+    )
+    team = team_result.scalar_one_or_none()
+    if not team:
+        return None
+
+    agents_result = await db.execute(
+        select(User).where(
+            User.company_id == company_id,
+            User.role == "it_staff",
+            User.team_id == team.id,
+        )
+    )
+    agents = agents_result.scalars().all()
+    if not agents:
+        return None
+
+    best_agent: Optional[User] = None
+    best_load: Optional[int] = None
+    for agent in agents:
+        load_result = await db.execute(
+            select(func.count(Ticket.id)).where(
+                Ticket.assigned_to == agent.id,
+                Ticket.status.notin_(["resolved", "closed", "auto_resolved"]),
+            )
+        )
+        load = load_result.scalar() or 0
+        if best_load is None or load < best_load:
+            best_load = load
+            best_agent = agent
+
+    return best_agent
+
+
 async def _get_ticket_or_404(db: AsyncSession, ticket_id: uuid.UUID) -> Ticket:
     """Fetch ticket with messages and relationships, raise 404 if not found."""
     result = await db.execute(
@@ -92,7 +142,6 @@ async def _get_ticket_or_404(db: AsyncSession, ticket_id: uuid.UUID) -> Ticket:
             selectinload(Ticket.creator),
             selectinload(Ticket.assignee_user),
             selectinload(Ticket.messages).selectinload(TicketMessage.author),
-            selectinload(Ticket.suggested_article),
         )
         .where(Ticket.id == ticket_id)
     )
@@ -156,14 +205,31 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
     ai_conf = None
     ai_cat = None
     ai_priority = None
+    ai_assigned_team = None
     is_duplicate = False
+
+    # Build tenant-scoped category/team constraints from team names only
+    team_result = await db.execute(
+        select(Team).where(Team.company_id == current_user.company_id)
+    )
+    teams = team_result.scalars().all()
+    category_team_map = {
+        team.name.strip(): team.name.strip()
+        for team in teams
+        if team.name and team.name.strip()
+    }
+    if not category_team_map:
+        category_team_map[FALLBACK_CATEGORY] = FALLBACK_TEAM
+    allowed_categories = list(category_team_map.keys())
 
     try:
         # Analyzeticket with AI
         ai_analysis = await analyze_ticket_with_ai(
             subject=payload.title,
             description=payload.description,
-            company_id=str(current_user.company_id)
+            company_id=str(current_user.company_id),
+            allowed_categories=allowed_categories,
+            category_team_map=category_team_map,
         )
 
         if ai_analysis and ai_analysis.get("success"):
@@ -171,7 +237,25 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
             ai_conf = ai_analysis.get("confidence")
             ai_cat = ai_analysis.get("category")
             ai_priority = ai_analysis.get("priority")
+            ai_assigned_team = ai_analysis.get("assigned_team")
             is_duplicate = ai_analysis.get("is_duplicate", False)
+
+            mapped_ai_cat = ai.map_to_allowed_category(ai_cat, allowed_categories)
+            if mapped_ai_cat:
+                ai_cat = mapped_ai_cat
+            else:
+                ai_cat = await ai.classify_ticket_to_allowed_category(
+                    payload.title,
+                    payload.description,
+                    allowed_categories,
+                )
+
+            # Apply strict company mapping guard before persisting
+            if ai_cat not in category_team_map:
+                ai_cat = FALLBACK_CATEGORY
+                ai_assigned_team = category_team_map.get(FALLBACK_CATEGORY, FALLBACK_TEAM)
+            elif not ai_assigned_team:
+                ai_assigned_team = category_team_map.get(ai_cat)
 
             # Auto-resolve if AI determines it should be resolved
             if ai_analysis.get("should_resolve", False):
@@ -179,19 +263,36 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
     except Exception as e:
         # AI service unavailable - continue without AIanalysis
         print(f"AI analysis failed: {e}")
-        pass
+        ai_cat = await ai.classify_ticket_to_allowed_category(
+            payload.title,
+            payload.description,
+            allowed_categories,
+        )
+        if not ai_cat:
+            ai_cat = FALLBACK_CATEGORY
+        ai_assigned_team = category_team_map.get(ai_cat, category_team_map.get(FALLBACK_CATEGORY, FALLBACK_TEAM))
 
     # Create ticket with AI data
+    final_priority = ai_priority or payload.priority
+    final_department = payload.department or ai_assigned_team
+    auto_assignee = await _pick_assignee_for_team(db, current_user.company_id, ai_assigned_team)
+    assigned_to_id = auto_assignee.id if auto_assignee else None
+    if assigned_to_id and initial_status == "new":
+        initial_status = "assigned"
+
     ticket = Ticket(
         company_id=current_user.company_id,
         ticket_number=ticket_number,
         title=payload.title,
         description=payload.description,
-        priority=payload.priority,
+        priority=final_priority,
         source=payload.source,
-        department=payload.department,
+        department=final_department,
         created_by=current_user.id,
         status=initial_status,
+        category=ai_cat,
+        assigned_team=ai_assigned_team,
+        assigned_to=assigned_to_id,
         # AI fields
         ai_response=ai_response_text,
         ai_confidence=ai_conf,
@@ -201,6 +302,7 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
         resolved_at=datetime.now(timezone.utc) if initial_status == "resolved" else None,
     )
     db.add(ticket)
+    await db.flush()
 
     # If AI provided a response, add it as the first message in the thread
     if ai_response_text:
@@ -229,7 +331,17 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
     await db.commit()
     await db.refresh(ticket)
 
-    return _build_ticket_list_item(ticket, creator=current_user)
+    if ticket.assigned_team:
+        await notify_ticket_routed(
+            ticket_number=ticket.ticket_number or str(ticket.id),
+            ticket_title=ticket.title,
+            reporter_email=current_user.email,
+            team_name=ticket.assigned_team,
+            assignee_name=auto_assignee.full_name if auto_assignee else None,
+            frontend_url=settings.FRONTEND_URL,
+        )
+
+    return _build_ticket_list_item(ticket, creator=current_user, assignee=auto_assignee)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -397,18 +509,21 @@ async def get_ticket(ticket_id: uuid.UUID, current_user: CurrentUser, db: DB):
 
     # Similar articles via vector search
     similar_articles = []
-    if ticket.embedding:
-        similar = await find_similar_articles(db, ticket.company_id, ticket.embedding, limit=3)
-        for article, sim in similar:
-            similar_articles.append(
-                SimilarArticleOut(
-                    id=article.id,
-                    title=article.title,
-                    tag=article.category or "",
-                    summary=article.content[:150] + "..." if len(article.content) > 150 else article.content,
-                    similarity=round(sim, 3),
+    if ticket.embedding is not None:
+        try:
+            similar = await find_similar_articles(db, ticket.company_id, ticket.embedding, limit=3)
+            for article, sim in similar:
+                similar_articles.append(
+                    SimilarArticleOut(
+                        id=article.id,
+                        title=article.title,
+                        tag=article.category or "",
+                        summary=article.content[:150] + "..." if len(article.content) > 150 else article.content,
+                        similarity=round(sim, 3),
+                    )
                 )
-            )
+        except Exception as exc:
+            logger.warning("Similar article lookup failed for ticket %s: %s", ticket.id, exc)
 
     return TicketOut(
         id=ticket.id,
@@ -508,9 +623,27 @@ async def assign_ticket(
     if ticket.status == "new":
         ticket.status = "assigned"
 
+    assignee_user: Optional[User] = None
+    if ticket.assigned_to:
+        assignee_result = await db.execute(select(User).where(User.id == ticket.assigned_to))
+        assignee_user = assignee_result.scalar_one_or_none()
+
     await db.commit()
     await db.refresh(ticket)
-    return _build_ticket_list_item(ticket)
+
+    reporter_result = await db.execute(select(User).where(User.id == ticket.created_by))
+    reporter_user = reporter_result.scalar_one_or_none()
+    if reporter_user and reporter_user.email and ticket.assigned_team:
+        await notify_ticket_routed(
+            ticket_number=ticket.ticket_number or str(ticket.id),
+            ticket_title=ticket.title,
+            reporter_email=reporter_user.email,
+            team_name=ticket.assigned_team,
+            assignee_name=assignee_user.full_name if assignee_user else None,
+            frontend_url=settings.FRONTEND_URL,
+        )
+
+    return _build_ticket_list_item(ticket, assignee=assignee_user)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

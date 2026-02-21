@@ -31,13 +31,25 @@ class Settings(BaseSettings):
     JINA_API_KEY: Optional[str] = None
     JINA_MODEL: str = "jina-embeddings-v2-base-en"
     EMBEDDING_DIMENSION: int = 768
+    AI_SERVICE_URL: str = "http://localhost:8001"
+    AI_SERVICE_TIMEOUT: float = 30.0
 
     # ── Notifications ─────────────────────────────────────────────────────────
     RESEND_API_KEY: Optional[str] = None
-    RESEND_FROM_EMAIL: str = "helpdesk@example.com"
+    RESEND_FROM_EMAIL: str = "taksshinamoorthy@gmail.com"
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_PHONE_NUMBER: Optional[str] = None
+
+    # ── Google OAuth / Gmail ────────────────────────────────────────────────
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+    GOOGLE_OAUTH_SCOPES: str = (
+        "openid email profile "
+        "https://www.googleapis.com/auth/gmail.readonly "
+        "https://www.googleapis.com/auth/gmail.send"
+    )
 
     # ── Monitoring ────────────────────────────────────────────────────────────
     SENTRY_DSN: Optional[str] = None

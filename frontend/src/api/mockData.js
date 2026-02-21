@@ -361,8 +361,10 @@ export const mockRemoveAgentFromTeam = (teamId, agentId) => {
   return mockResponse({ success: true });
 };
 
-export const mockGetMappings = () => mockResponse({ mappings: [] });
-export const mockSaveMappings = (mappings) => mockResponse({ mappings });
+export const mockGetMappings = () => mockResponse([
+  { id: `map-${randomId()}`, company_id: 'c-1', category: 'Others', team_name: 'Others' },
+]);
+export const mockSaveMappings = (mappings) => mockResponse(mappings);
 export const mockGetNotifications = () => mockResponse({ email_enabled: true, slack_enabled: false });
 export const mockUpdateNotifications = (data) => mockResponse(data);
 

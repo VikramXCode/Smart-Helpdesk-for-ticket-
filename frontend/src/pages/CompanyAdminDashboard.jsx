@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AdminLayout } from '../components/AdminLayout';
 import { getOverview, getVolume, getCategories } from '../api/analytics';
-import { listAgents, createAgent, listTeams, createTeam, updateTeam, deleteTeam, assignAgentToTeam, removeAgentFromTeam } from '../api/admin';
+import { listAgents, createAgent, listTeams, createTeam, updateTeam, deleteTeam } from '../api/admin';
+import { changePassword } from '../api/auth';
 import toast from 'react-hot-toast';
 
 const CompanyAdminDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [volume, setVolume] = useState(null);
@@ -20,15 +21,24 @@ const CompanyAdminDashboard = () => {
 
   // Add Agent modal
   const [showAddAgent, setShowAddAgent] = useState(false);
-  const [newAgent, setNewAgent] = useState({ email: '', full_name: '', password: '', role: 'it_staff', department: '' });
+  const [newAgent, setNewAgent] = useState({ email: '', full_name: '', role: 'it_staff', department: '' });
 
   // Add Team modal
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [newTeam, setNewTeam] = useState({ name: '', description: '', email: '' });
   const [editingTeamId, setEditingTeamId] = useState(null);
+  const [showForcePasswordModal, setShowForcePasswordModal] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
 
   useEffect(() => { loadData(); }, []);
   useEffect(() => { getVolume(volumePeriod).then(r => setVolume(r.data)).catch(() => {}); }, [volumePeriod]);
+  useEffect(() => {
+    if (user?.role === 'company_admin' && user?.password_change_required) {
+      setShowForcePasswordModal(true);
+      setPasswordForm((prev) => ({ ...prev, current: prev.current || '12345678' }));
+    }
+  }, [user]);
 
   const loadData = async () => {
     try {
@@ -51,13 +61,42 @@ const CompanyAdminDashboard = () => {
     }
   };
 
+  const handleForcePasswordChange = async (e) => {
+    e.preventDefault();
+    if (!passwordForm.current || !passwordForm.next || !passwordForm.confirm) {
+      toast.error('Please fill all password fields');
+      return;
+    }
+    if (passwordForm.next !== passwordForm.confirm) {
+      toast.error('New password and confirmation do not match');
+      return;
+    }
+    if (passwordForm.next.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      await changePassword(passwordForm.current, passwordForm.next);
+      await refreshUser();
+      setShowForcePasswordModal(false);
+      setPasswordForm({ current: '', next: '', confirm: '' });
+      toast.success('Password updated successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update password');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const handleAddAgent = async (e) => {
     e.preventDefault();
     try {
       await createAgent(newAgent);
       toast.success('Agent added successfully');
       setShowAddAgent(false);
-      setNewAgent({ email: '', full_name: '', password: '', role: 'it_staff', department: '' });
+      setNewAgent({ email: '', full_name: '', role: 'it_staff', department: '' });
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to add agent');
@@ -144,6 +183,9 @@ const CompanyAdminDashboard = () => {
   const statusDot = (s) => s === 'online' ? 'bg-emerald-500' : s === 'away' ? 'bg-amber-500' : 'bg-slate-500';
 
   const o = overview || {};
+  const onlineAgents = agents.filter((agent) => agent.status === 'online').length;
+  const awayAgents = agents.filter((agent) => agent.status === 'away').length;
+  const offlineAgents = Math.max(0, agents.length - onlineAgents - awayAgents);
   const headerAction = (
     <button onClick={() => navigate('/staff/tickets')} className="flex items-center gap-2 bg-primary hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
       <span className="material-symbols-outlined text-[20px]">confirmation_number</span><span>View Tickets</span>
@@ -181,6 +223,54 @@ const CompanyAdminDashboard = () => {
                     <div className="bg-rose-50 dark:bg-rose-900/20 p-2 rounded-lg text-rose-600"><span className="material-symbols-outlined">auto_awesome</span></div>
                   </div>
                   <div><p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">AI Resolution Rate</p><h3 className="text-3xl font-bold text-primary dark:text-white tracking-tight">{loading ? '—' : `${o.ai_resolution_rate ?? 0}%`}</h3></div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+                  <h3 className="text-lg font-bold text-primary dark:text-white mb-1">Operations Snapshot</h3>
+                  <p className="text-sm text-slate-500 mb-5">Current staffing and routing readiness across your support operation.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Total Agents', value: agents.length, icon: 'support_agent', color: 'text-blue-600 bg-blue-50' },
+                      { label: 'Online Now', value: onlineAgents, icon: 'wifi', color: 'text-emerald-600 bg-emerald-50' },
+                      { label: 'Teams Configured', value: teams.length, icon: 'groups', color: 'text-violet-600 bg-violet-50' },
+                      { label: 'Categories (from Teams)', value: teams.length, icon: 'alt_route', color: 'text-orange-600 bg-orange-50' },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-900/50">
+                        <div className="flex items-center justify-between">
+                          <span className={`material-symbols-outlined ${item.color} rounded-lg p-2`}>{item.icon}</span>
+                          <span className="text-xl font-bold text-slate-900 dark:text-white">{item.value}</span>
+                        </div>
+                        <p className="text-xs uppercase tracking-wider text-slate-500 mt-3">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+                  <h3 className="text-lg font-bold text-primary dark:text-white mb-1">Agent Presence</h3>
+                  <p className="text-sm text-slate-500 mb-5">Live team availability at a glance.</p>
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Online', value: onlineAgents, bar: 'bg-emerald-500' },
+                      { label: 'Away', value: awayAgents, bar: 'bg-amber-500' },
+                      { label: 'Offline', value: offlineAgents, bar: 'bg-slate-500' },
+                    ].map((row) => {
+                      const width = agents.length ? (row.value / agents.length) * 100 : 0;
+                      return (
+                        <div key={row.label}>
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-slate-600 dark:text-slate-300">{row.label}</span>
+                            <span className="font-semibold text-slate-800 dark:text-white">{row.value}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700">
+                            <div className={`h-2 rounded-full ${row.bar}`} style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -365,10 +455,11 @@ const CompanyAdminDashboard = () => {
             <form onSubmit={handleAddAgent} className="space-y-4">
               <input className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5" placeholder="Full Name" value={newAgent.full_name} onChange={e => setNewAgent({...newAgent, full_name: e.target.value})} required />
               <input className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5" placeholder="Email" type="email" value={newAgent.email} onChange={e => setNewAgent({...newAgent, email: e.target.value})} required />
-              <input className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5" placeholder="Password" type="password" value={newAgent.password} onChange={e => setNewAgent({...newAgent, password: e.target.value})} required />
+              <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-sm px-4 py-2.5 text-slate-500 dark:text-slate-300">
+                Default password: 12345678 (agent must change on first login)
+              </div>
               <select className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5" value={newAgent.role} onChange={e => setNewAgent({...newAgent, role: e.target.value})}>
                 <option value="it_staff">IT Staff</option>
-                <option value="company_admin">Company Admin</option>
               </select>
               <input className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5" placeholder="Department (optional)" value={newAgent.department} onChange={e => setNewAgent({...newAgent, department: e.target.value})} />
               <div className="flex gap-3 pt-2">
@@ -393,6 +484,44 @@ const CompanyAdminDashboard = () => {
                 <button type="button" onClick={() => { setShowAddTeam(false); setEditingTeamId(null); }} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors dark:text-white">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors">{editingTeamId ? 'Update Team' : 'Create Team'}</button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showForcePasswordModal && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Change Default Password</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">For security, you must change the default company admin password before continuing.</p>
+            <form onSubmit={handleForcePasswordChange} className="space-y-3">
+              <input
+                type="password"
+                placeholder="Current password"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5"
+                value={passwordForm.current}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, current: e.target.value }))}
+                required
+              />
+              <input
+                type="password"
+                placeholder="New password"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5"
+                value={passwordForm.next}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, next: e.target.value }))}
+                required
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm px-4 py-2.5"
+                value={passwordForm.confirm}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm: e.target.value }))}
+                required
+              />
+              <button type="submit" disabled={changingPassword} className="w-full px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-60">
+                {changingPassword ? 'Updating...' : 'Update Password'}
+              </button>
             </form>
           </div>
         </div>

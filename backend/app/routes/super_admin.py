@@ -15,10 +15,23 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException, Query, status
 from passlib.context import CryptContext
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.dependencies import CurrentUser, DB, require_super_admin
-from app.models import Company, Ticket, User
+from app.models import (
+    Company,
+    CompanyIssue,
+    CompanyIssueMessage,
+    CompanyTeamMapping,
+    KnowledgeArticle,
+    NotificationsConfig,
+    Team,
+    Ticket,
+    TicketMessage,
+    TrendCluster,
+    User,
+)
 from app.schemas import (
     CompanyCreate,
     CompanyListResponse,
@@ -105,14 +118,14 @@ async def get_stats(db: DB):
     )
     ai_resolved = r_ai.scalar() or 0
 
-    ai_rate = round((ai_resolved / resolved_tickets * 100), 1) if resolved_tickets > 0 else 67.3
+    ai_rate = round((ai_resolved / resolved_tickets * 100), 1) if resolved_tickets > 0 else 0.0
 
     return SuperAdminStats(
-        total_companies=total_companies if total_companies > 0 else 5,
+        total_companies=total_companies,
         total_companies_change="+1 this month",
-        total_users=total_users if total_users > 0 else 1248,
+        total_users=total_users,
         total_users_change="+84 this month",
-        processed_tickets=resolved_tickets if resolved_tickets > 0 else 15420,
+        processed_tickets=resolved_tickets,
         processed_tickets_change="+12% vs last month",
         ai_resolution_rate=ai_rate,
     )
@@ -227,11 +240,57 @@ async def update_company(
 
 @router.delete("/companies/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_company(company_id: uuid.UUID, db: DB):
-    """Permanently delete a company and all its data (cascade)."""
+    """Permanently delete a company and all its tenant-scoped data."""
     r = await db.execute(select(Company).where(Company.id == company_id))
     company = r.scalar_one_or_none()
     if not company:
         raise NotFoundError("Company")
 
-    await db.delete(company)
-    await db.commit()
+    try:
+        # Delete ticket messages for company tickets
+        await db.execute(
+            delete(TicketMessage).where(
+                TicketMessage.ticket_id.in_(
+                    select(Ticket.id).where(Ticket.company_id == company_id)
+                )
+            )
+        )
+
+        # Delete ticket threads before users (tickets reference created_by)
+        await db.execute(delete(Ticket).where(Ticket.company_id == company_id))
+
+        # Delete issue conversation data
+        await db.execute(
+            delete(CompanyIssueMessage).where(
+                CompanyIssueMessage.issue_id.in_(
+                    select(CompanyIssue.id).where(CompanyIssue.company_id == company_id)
+                )
+            )
+        )
+        await db.execute(delete(CompanyIssue).where(CompanyIssue.company_id == company_id))
+
+        # Delete remaining tenant-scoped entities
+        await db.execute(delete(CompanyTeamMapping).where(CompanyTeamMapping.company_id == company_id))
+        await db.execute(delete(NotificationsConfig).where(NotificationsConfig.company_id == company_id))
+        await db.execute(delete(KnowledgeArticle).where(KnowledgeArticle.company_id == company_id))
+        await db.execute(delete(TrendCluster).where(TrendCluster.company_id == company_id))
+
+        # Delete users before teams to avoid team FK references
+        await db.execute(delete(User).where(User.company_id == company_id))
+        await db.execute(delete(Team).where(Team.company_id == company_id))
+
+        # Finally delete company row
+        await db.execute(delete(Company).where(Company.id == company_id))
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unable to delete company due to related records. Please retry.",
+        )
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete company",
+        )

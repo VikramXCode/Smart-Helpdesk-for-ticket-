@@ -36,6 +36,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
+  const refreshUser = useCallback(async () => {
+    const res = await getMe();
+    setUser(res.data);
+    localStorage.setItem('user', JSON.stringify(res.data));
+    return res.data;
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const res = await loginApi(email, password);
     const { access_token, user: userData } = res.data;
@@ -56,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!token && !!user;
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, isAuthenticated, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

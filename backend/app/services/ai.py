@@ -12,6 +12,7 @@ so the application can run and demo without external dependencies.
 """
 import hashlib
 import random
+import re
 from typing import List, Optional
 
 import httpx
@@ -58,6 +59,52 @@ CATEGORY_DISPLAY = {
     "HR Policy": "HR",
     "Facilities": "General",
 }
+
+
+def _normalize_label(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def map_to_allowed_category(raw_category: Optional[str], allowed_categories: List[str]) -> Optional[str]:
+    """Map arbitrary model output to one of allowed categories using generic string similarity."""
+    if not raw_category or not allowed_categories:
+        return None
+
+    exact_map = {cat.lower(): cat for cat in allowed_categories}
+    if raw_category.lower() in exact_map:
+        return exact_map[raw_category.lower()]
+
+    normalized_allowed = {_normalize_label(cat): cat for cat in allowed_categories}
+    normalized_raw = _normalize_label(raw_category)
+    if normalized_raw in normalized_allowed:
+        return normalized_allowed[normalized_raw]
+
+    raw_tokens = set(normalized_raw.split())
+    best_cat: Optional[str] = None
+    best_score = 0.0
+
+    for allowed in allowed_categories:
+        normalized_allowed_value = _normalize_label(allowed)
+        allowed_tokens = set(normalized_allowed_value.split())
+
+        score = 0.0
+        if normalized_allowed_value and (
+            normalized_allowed_value in normalized_raw or normalized_raw in normalized_allowed_value
+        ):
+            score = max(score, 0.8)
+
+        if raw_tokens and allowed_tokens:
+            overlap = len(raw_tokens & allowed_tokens)
+            if overlap:
+                score = max(score, overlap / max(len(allowed_tokens), 1))
+
+        if score > best_score:
+            best_score = score
+            best_cat = allowed
+
+    if best_score >= 0.3:
+        return best_cat
+    return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +195,58 @@ async def classify_ticket(title: str, description: str) -> str:
     except Exception as e:
         logger.error("groq_classification_failed", error=str(e))
         return _mock_category(title, description)
+
+
+async def classify_ticket_to_allowed_category(
+    title: str,
+    description: str,
+    allowed_categories: List[str],
+) -> Optional[str]:
+    """Classify a ticket into one category from tenant-provided allowed categories."""
+    if not allowed_categories:
+        return None
+
+    if settings.GROQ_API_KEY:
+        categories_str = "\n".join(f"- {c}" for c in allowed_categories)
+        prompt = (
+            "You are an IT helpdesk routing engine. "
+            "Choose exactly ONE category from the allowed categories list below.\n"
+            f"Allowed categories:\n{categories_str}\n\n"
+            f"Ticket Title: {title}\n"
+            f"Ticket Description: {description}\n\n"
+            "Return only the category name exactly as written in the list."
+        )
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": settings.GROQ_MODEL,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You classify tickets into provided categories. Return only one allowed category.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0,
+                        "max_tokens": 50,
+                    },
+                )
+                response.raise_for_status()
+                category = response.json()["choices"][0]["message"]["content"].strip()
+                mapped = map_to_allowed_category(category, allowed_categories)
+                if mapped:
+                    return mapped
+        except Exception as e:
+            logger.error("groq_allowed_category_classification_failed", error=str(e))
+
+    generic_category = await classify_ticket(title, description)
+    return map_to_allowed_category(generic_category, allowed_categories)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

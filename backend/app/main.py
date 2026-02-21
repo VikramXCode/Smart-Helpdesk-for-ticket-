@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.dependencies import engine
 from app.models import Base
-from app.routes import auth, tickets, chat, analytics, admin, super_admin, webhooks, knowledge
+from app.routes import auth, tickets, chat, analytics, admin, super_admin, webhooks, knowledge, issues
 from app.utils.exceptions import register_exception_handlers
 
 
@@ -83,6 +83,7 @@ app.include_router(analytics.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(super_admin.router, prefix=API_PREFIX)
 app.include_router(webhooks.router, prefix=API_PREFIX)
+app.include_router(issues.router, prefix=API_PREFIX)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Optional Sentry integration

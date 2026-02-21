@@ -21,6 +21,7 @@ Endpoints:
 - PUT    /admin/notifications    Update a notification config
 """
 import uuid
+import re
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -34,6 +35,10 @@ from app.schemas import (
     AgentListResponse,
     AgentOut,
     AgentUpdate,
+    EmployeeBulkCreateRequest,
+    EmployeeBulkCreateResponse,
+    EmployeeCreateRequest,
+    EmployeeCreateResponse,
     MappingBulkSave,
     MappingOut,
     NotificationsConfigOut,
@@ -49,6 +54,47 @@ from app.utils.exceptions import ForbiddenError, NotFoundError
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[require_company_admin()])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+DEFAULT_AGENT_PASSWORD = "12345678"
+DEFAULT_EMPLOYEE_PASSWORD = "12345678"
+FALLBACK_CATEGORY = "Others"
+FALLBACK_TEAM = "Others"
+EMAIL_REGEX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+async def _sync_team_name_mappings(db: DB, company_id):
+    """Persist mappings where category == team_name for all company teams."""
+    existing_result = await db.execute(
+        select(CompanyTeamMapping).where(CompanyTeamMapping.company_id == company_id)
+    )
+    for mapping in existing_result.scalars().all():
+        await db.delete(mapping)
+
+    teams_result = await db.execute(
+        select(Team).where(Team.company_id == company_id).order_by(Team.name)
+    )
+    teams = teams_result.scalars().all()
+
+    for team in teams:
+        if not team.name:
+            continue
+        normalized_name = team.name.strip()
+        if not normalized_name:
+            continue
+        db.add(
+            CompanyTeamMapping(
+                company_id=company_id,
+                category=normalized_name,
+                team_name=normalized_name,
+            )
+        )
+
+
+def _name_from_email(email: str) -> str:
+    local = email.split("@", 1)[0]
+    normalized = re.sub(r"[._-]+", " ", local).strip()
+    if not normalized:
+        return "Employee"
+    return " ".join(part.capitalize() for part in normalized.split())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,14 +142,14 @@ async def list_agents(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ):
-    """List all IT staff / company admin agents for the current company."""
+    """List all IT staff agents for the current company."""
     cid = current_user.company_id
     if not cid:
         raise HTTPException(status_code=400, detail="Super admins must specify a company")
 
     query = select(User).where(
         User.company_id == cid,
-        User.role.in_(["it_staff", "company_admin"]),
+        User.role == "it_staff",
     )
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
@@ -130,16 +176,16 @@ async def create_agent(payload: AgentCreate, current_user: CurrentUser, db: DB):
     if r.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered in this company")
 
-    # Validate role
-    if payload.role not in ("it_staff", "company_admin"):
-        raise HTTPException(status_code=400, detail="Role must be it_staff or company_admin")
+    # Agents are IT staff only
+    if payload.role and payload.role != "it_staff":
+        raise HTTPException(status_code=400, detail="Agents must have role it_staff")
 
     user = User(
         company_id=cid,
         email=payload.email,
-        hashed_password=pwd_context.hash(payload.password),
+        hashed_password=pwd_context.hash(payload.password or DEFAULT_AGENT_PASSWORD),
         full_name=payload.full_name,
-        role=payload.role,
+        role="it_staff",
         team_id=payload.team_id,
         department=payload.department,
         status="offline",
@@ -148,6 +194,103 @@ async def create_agent(payload: AgentCreate, current_user: CurrentUser, db: DB):
     await db.commit()
     await db.refresh(user)
     return await _build_agent_out(user, db)
+
+
+@router.post("/employees", response_model=EmployeeCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_employee(payload: EmployeeCreateRequest, current_user: CurrentUser, db: DB):
+    """Create one employee user under current company with default initial password."""
+    cid = current_user.company_id
+    if not cid:
+        raise HTTPException(status_code=400, detail="Super admins must specify a company")
+
+    email = payload.email.strip().lower()
+
+    existing = await db.execute(
+        select(User).where(User.company_id == cid, User.email == email)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Email already exists in this company")
+
+    user = User(
+        company_id=cid,
+        email=email,
+        hashed_password=pwd_context.hash(DEFAULT_EMPLOYEE_PASSWORD),
+        full_name=(payload.full_name.strip() if payload.full_name else _name_from_email(email)),
+        role="employee",
+        status="offline",
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return EmployeeCreateResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+    )
+
+
+@router.post("/employees/bulk-create", response_model=EmployeeBulkCreateResponse)
+async def bulk_create_employees(payload: EmployeeBulkCreateRequest, current_user: CurrentUser, db: DB):
+    """Bulk-create employee users from email list for the current company."""
+    cid = current_user.company_id
+    if not cid:
+        raise HTTPException(status_code=400, detail="Super admins must specify a company")
+
+    if not payload.emails:
+        raise HTTPException(status_code=400, detail="No emails provided")
+
+    normalized_emails: list[str] = []
+    skipped: set[str] = set()
+    seen: set[str] = set()
+
+    for raw in payload.emails:
+        email = (raw or "").strip().lower()
+        if not email:
+            continue
+        if not EMAIL_REGEX.match(email):
+            skipped.add(email)
+            continue
+        if email in seen:
+            skipped.add(email)
+            continue
+        seen.add(email)
+        normalized_emails.append(email)
+
+    if not normalized_emails:
+        return EmployeeBulkCreateResponse(created_count=0, created_emails=[], skipped_emails=sorted(skipped))
+
+    existing_rows = await db.execute(
+        select(User.email).where(
+            User.company_id == cid,
+            User.email.in_(normalized_emails),
+        )
+    )
+    existing_emails = {row[0].strip().lower() for row in existing_rows.all() if row[0]}
+    skipped.update(existing_emails)
+
+    to_create = [email for email in normalized_emails if email not in existing_emails]
+    created_emails: list[str] = []
+    for email in to_create:
+        user = User(
+            company_id=cid,
+            email=email,
+            hashed_password=pwd_context.hash(DEFAULT_EMPLOYEE_PASSWORD),
+            full_name=_name_from_email(email),
+            role="employee",
+            status="offline",
+        )
+        db.add(user)
+        created_emails.append(email)
+
+    await db.commit()
+
+    return EmployeeBulkCreateResponse(
+        created_count=len(created_emails),
+        created_emails=created_emails,
+        skipped_emails=sorted(skipped),
+    )
 
 
 @router.patch("/agents/{agent_id}", response_model=AgentOut)
@@ -164,8 +307,8 @@ async def update_agent(
 
     if payload.full_name is not None:
         user.full_name = payload.full_name
-    if payload.role is not None:
-        user.role = payload.role
+    if payload.role is not None and payload.role != "it_staff":
+        raise HTTPException(status_code=400, detail="Agents must have role it_staff")
     if payload.team_id is not None:
         user.team_id = payload.team_id
     if payload.status is not None:
@@ -246,6 +389,8 @@ async def create_team(payload: TeamCreate, current_user: CurrentUser, db: DB):
         email=str(payload.email) if payload.email else None
     )
     db.add(team)
+    await db.flush()
+    await _sync_team_name_mappings(db, cid)
     await db.commit()
     await db.refresh(team)
     return TeamOut(
@@ -276,6 +421,7 @@ async def update_team(team_id: uuid.UUID, payload: TeamUpdate, current_user: Cur
     if payload.email is not None:
         team.email = str(payload.email)
 
+    await _sync_team_name_mappings(db, team.company_id)
     await db.commit()
     await db.refresh(team)
 
@@ -301,7 +447,10 @@ async def delete_team(team_id: uuid.UUID, current_user: CurrentUser, db: DB):
         raise NotFoundError("Team")
     if current_user.company_id and team.company_id != current_user.company_id:
         raise ForbiddenError()
+    company_id = team.company_id
     await db.delete(team)
+    await db.flush()
+    await _sync_team_name_mappings(db, company_id)
     await db.commit()
 
 
@@ -326,6 +475,8 @@ async def assign_agent_to_team(
     agent = r_agent.scalar_one_or_none()
     if not agent:
         raise NotFoundError("Agent")
+    if agent.role != "it_staff":
+        raise HTTPException(status_code=400, detail="Only IT staff can be assigned to teams")
     if agent.company_id != team.company_id:
         raise HTTPException(status_code=400, detail="Agent must be from the same company")
 
@@ -372,10 +523,13 @@ async def remove_agent_from_team(
 
 @router.get("/mappings", response_model=List[MappingOut])
 async def get_mappings(current_user: CurrentUser, db: DB):
-    """List category→team routing mappings for this company."""
+    """List category→team routing mappings (category is always team name)."""
     cid = current_user.company_id
     if not cid:
         raise HTTPException(status_code=400, detail="Super admins must specify a company")
+
+    await _sync_team_name_mappings(db, cid)
+    await db.commit()
 
     r = await db.execute(
         select(CompanyTeamMapping)
@@ -387,35 +541,20 @@ async def get_mappings(current_user: CurrentUser, db: DB):
 
 @router.post("/mappings", response_model=List[MappingOut])
 async def save_mappings(payload: MappingBulkSave, current_user: CurrentUser, db: DB):
-    """Bulk replace all category→team mappings for this company."""
+    """Sync mappings from team names only (manual category mappings are ignored)."""
     cid = current_user.company_id
     if not cid:
         raise HTTPException(status_code=400, detail="Super admins must specify a company")
 
-    # Delete existing mappings for this company
-    r = await db.execute(
-        select(CompanyTeamMapping).where(CompanyTeamMapping.company_id == cid)
-    )
-    existing = r.scalars().all()
-    for mapping in existing:
-        await db.delete(mapping)
-
-    # Insert new mappings
-    new_mappings = []
-    for item in payload.mappings:
-        m = CompanyTeamMapping(
-            company_id=cid,
-            category=item.category,
-            team_name=item.team_name,
-        )
-        db.add(m)
-        new_mappings.append(m)
-
+    await _sync_team_name_mappings(db, cid)
     await db.commit()
-    for m in new_mappings:
-        await db.refresh(m)
 
-    return new_mappings
+    synced = await db.execute(
+        select(CompanyTeamMapping)
+        .where(CompanyTeamMapping.company_id == cid)
+        .order_by(CompanyTeamMapping.category)
+    )
+    return list(synced.scalars().all())
 
 
 # ─────────────────────────────────────────────────────────────────────────────

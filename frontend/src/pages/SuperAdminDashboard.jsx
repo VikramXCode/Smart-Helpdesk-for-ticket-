@@ -1,19 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AdminLayout } from '../components/AdminLayout';
 import { getStats, listCompanies, createCompany, updateCompany, deleteCompany } from '../api/superadmin';
 import toast from 'react-hot-toast';
 
+const SLUG_REGEX = /^[a-z0-9-]{2,100}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const SuperAdminDashboard = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [stats, setStats] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddCompany, setShowAddCompany] = useState(false);
-  const [newCompany, setNewCompany] = useState({ name: '', slug: '', domain: '', admin_email: '', admin_name: '', admin_password: '' });
+  const [newCompany, setNewCompany] = useState({ name: '', slug: '', domain: '', admin_email: '', admin_name: '', admin_password: '12345678' });
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (!location.hash) return;
+
+    if (location.hash === '#onboardSection') {
+      setShowAddCompany(true);
+      return;
+    }
+
+    const targetId = location.hash.replace('#', '');
+    const target = document.getElementById(targetId);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.hash]);
 
   const loadData = async () => {
     setLoading(true);
@@ -31,11 +51,33 @@ const SuperAdminDashboard = () => {
 
   const handleCreateCompany = async (e) => {
     e.preventDefault();
+    const normalizedSlug = (newCompany.slug || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[_\s]+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    if (!SLUG_REGEX.test(normalizedSlug)) {
+      toast.error('Slug must be 2-100 chars: lowercase letters, numbers, and hyphens only');
+      return;
+    }
+
+    if ((newCompany.admin_name || '').trim().length < 2) {
+      toast.error('Admin name must be at least 2 characters');
+      return;
+    }
+
     try {
-      await createCompany(newCompany);
+      await createCompany({
+        name: (newCompany.name || '').trim(),
+        slug: normalizedSlug,
+        admin_name: (newCompany.admin_name || '').trim(),
+        admin_email: (newCompany.admin_email || '').trim(),
+        admin_password: newCompany.admin_password,
+      });
       toast.success('Company created successfully!');
       setShowAddCompany(false);
-      setNewCompany({ name: '', slug: '', domain: '', admin_email: '', admin_name: '', admin_password: '' });
+      setNewCompany({ name: '', slug: '', domain: '', admin_email: '', admin_name: '', admin_password: '12345678' });
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to create company');
@@ -44,6 +86,10 @@ const SuperAdminDashboard = () => {
 
   const handleDelete = async (id, name) => {
     if (!confirm(`Delete ${name}? This is irreversible.`)) return;
+    if (!id || !UUID_REGEX.test(String(id))) {
+      toast.error('Invalid tenant id; please refresh and try again');
+      return;
+    }
     try {
       await deleteCompany(id);
       toast.success(`${name} deleted`);
@@ -71,7 +117,7 @@ const SuperAdminDashboard = () => {
   }
 
   const headerAction = (
-    <button onClick={() => setShowAddCompany(true)} className="flex items-center gap-2 h-9 px-4 bg-primary text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
+    <button id="onboardSection" onClick={() => setShowAddCompany(true)} className="flex items-center gap-2 h-9 px-4 bg-primary text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
       <span className="material-symbols-outlined text-[18px]">add</span> Onboard Tenant
     </button>
   );
@@ -80,12 +126,12 @@ const SuperAdminDashboard = () => {
     <AdminLayout title="Platform Dashboard" headerAction={headerAction}>
       <div className="p-6 space-y-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div id="platformMetrics" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { label: 'Total Companies', value: stats?.total_companies ?? companies.length, icon: 'apartment', color: 'text-blue-600 bg-blue-50' },
               { label: 'Total Users', value: stats?.total_users ?? '—', icon: 'group', color: 'text-emerald-600 bg-emerald-50' },
               { label: 'Active Tickets', value: stats?.active_tickets ?? '—', icon: 'confirmation_number', color: 'text-orange-600 bg-orange-50' },
-              { label: 'AI Resolution Rate', value: stats?.ai_resolution_rate ? `${Math.round(stats.ai_resolution_rate * 100)}%` : '—', icon: 'smart_toy', color: 'text-violet-600 bg-violet-50' },
+              { label: 'AI Resolution Rate', value: stats?.ai_resolution_rate != null ? `${Math.round(stats.ai_resolution_rate)}%` : '—', icon: 'smart_toy', color: 'text-violet-600 bg-violet-50' },
             ].map((kpi, i) => (
               <div key={i} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
                 <div className={`${kpi.color} rounded-xl p-3`}>
@@ -108,8 +154,8 @@ const SuperAdminDashboard = () => {
               </h3>
               <div className="space-y-3">
                 {companies.slice(0, 5).map((c, i) => {
-                  const count = c.ticket_count || Math.floor(Math.random() * 50 + 10);
-                  const maxCount = Math.max(...companies.slice(0, 5).map(cc => cc.ticket_count || 50));
+                  const count = c.ticket_count ?? 0;
+                  const maxCount = Math.max(1, ...companies.slice(0, 5).map(cc => cc.ticket_count ?? 0));
                   return (
                     <div key={i} className="flex items-center gap-3">
                       <span className="text-xs font-medium text-slate-600 w-28 truncate">{c.name}</span>

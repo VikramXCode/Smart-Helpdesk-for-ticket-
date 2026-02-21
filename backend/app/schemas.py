@@ -39,6 +39,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: "UserOut"
+    password_change_required: bool = False
 
 
 class UserOut(BaseModel):
@@ -53,8 +54,19 @@ class UserOut(BaseModel):
     avatar_url: Optional[str] = None
     status: str = "offline"
     department: Optional[str] = None
+    password_change_required: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class GoogleAuthUrlResponse(BaseModel):
+    auth_url: str
+
+
+class GoogleOAuthCallbackResponse(BaseModel):
+    success: bool
+    message: str
+    google_email: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,8 +78,13 @@ class CompanyCreate(BaseModel):
     slug: str = Field(..., min_length=2, max_length=100, pattern=r"^[a-z0-9-]+$")
     plan_tier: str = Field(default="Basic")
     admin_email: EmailStr
-    admin_password: str = Field(..., min_length=8)
+    admin_password: str = Field(default="12345678", min_length=8)
     admin_name: str = Field(..., min_length=2)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=8)
 
 
 class CompanyOut(BaseModel):
@@ -148,6 +165,47 @@ class MappingOut(BaseModel):
     team_name: str
 
     model_config = {"from_attributes": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Company Issues (company_admin ↔ super_admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class IssueCreate(BaseModel):
+    title: str = Field(..., min_length=3, max_length=255)
+    description: str = Field(..., min_length=5)
+
+
+class IssueMessageCreate(BaseModel):
+    content: str = Field(..., min_length=1)
+
+
+class IssueMessageOut(BaseModel):
+    id: uuid.UUID
+    issue_id: uuid.UUID
+    author_id: uuid.UUID
+    author_name: str
+    author_role: str
+    content: str
+    created_at: datetime
+
+
+class IssueOut(BaseModel):
+    id: uuid.UUID
+    company_id: uuid.UUID
+    company_name: Optional[str] = None
+    title: str
+    status: str
+    created_by: uuid.UUID
+    created_by_name: Optional[str] = None
+    message_count: int = 0
+    last_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IssueDetailOut(IssueOut):
+    messages: List[IssueMessageOut] = []
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -462,7 +520,7 @@ class NotificationsConfigUpdate(BaseModel):
 class AgentCreate(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=2)
-    password: str = Field(..., min_length=8)
+    password: str = Field(default="12345678", min_length=8)
     role: str = Field(default="it_staff")
     team_id: Optional[uuid.UUID] = None
     department: Optional[str] = None
@@ -496,6 +554,28 @@ class AgentListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class EmployeeBulkCreateRequest(BaseModel):
+    emails: List[str] = Field(..., min_length=1)
+
+
+class EmployeeCreateRequest(BaseModel):
+    email: EmailStr
+    full_name: Optional[str] = Field(default=None, min_length=2)
+
+
+class EmployeeCreateResponse(BaseModel):
+    id: uuid.UUID
+    email: str
+    full_name: str
+    role: str
+
+
+class EmployeeBulkCreateResponse(BaseModel):
+    created_count: int
+    created_emails: List[str] = []
+    skipped_emails: List[str] = []
 
 
 # ─────────────────────────────────────────────────────────────────────────────

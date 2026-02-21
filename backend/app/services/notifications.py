@@ -185,3 +185,37 @@ async def notify_ticket_resolved(
         f"[{ticket_number}] Resolved: {ticket_title}",
         html,
     )
+
+
+async def notify_ticket_routed(
+    ticket_number: str,
+    ticket_title: str,
+    reporter_email: Optional[str],
+    team_name: Optional[str],
+    assignee_name: Optional[str],
+    frontend_url: str,
+    eta_text: str = "within 2 hours",
+) -> None:
+    """Notify reporter that ticket has been routed to a team/agent."""
+    if not reporter_email:
+        return
+
+    team_display = team_name or "our support team"
+    assignee_display = assignee_name or "an IT support engineer"
+    ticket_url = f"{frontend_url}/tickets/{ticket_number}"
+
+    html = f"""
+    <h2>Your Ticket Has Been Directed</h2>
+    <p><strong>Ticket:</strong> {ticket_number}</p>
+    <p><strong>Title:</strong> {ticket_title}</p>
+    <p>Your ticket has been directed to the <strong>{team_display}</strong> team.</p>
+    <p><strong>{assignee_display}</strong> is looking after your request.</p>
+    <p>Target resolution time: <strong>{eta_text}</strong>.</p>
+    <p><a href="{ticket_url}">View Ticket →</a></p>
+    """
+
+    await send_email(
+        [reporter_email],
+        f"[{ticket_number}] Ticket routed to {team_display}",
+        html,
+    )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AdminLayout } from '../components/AdminLayout';
 import { createTicket, listTickets } from '../api/tickets';
@@ -9,10 +9,9 @@ import toast from 'react-hot-toast';
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [department, setDepartment] = useState('IT Support');
   const [submitting, setSubmitting] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState({ open: 0, resolved: 0, avgResolution: '—' });
@@ -57,7 +56,7 @@ const EmployeeDashboard = () => {
     if (!title.trim()) { toast.error('Please enter a ticket title'); return; }
     setSubmitting(true);
     try {
-      const res = await createTicket({ title, description, priority, department });
+      const res = await createTicket({ title, description });
       toast.success(`Ticket ${res.data.ticket_number} created!`);
       setTitle(''); setDescription('');
       loadData();
@@ -116,12 +115,55 @@ const EmployeeDashboard = () => {
     return `${days}d ago`;
   };
 
+  const path = (location.pathname || '').toLowerCase();
+  const activeView =
+    path.endsWith('/open')
+      ? 'open'
+      : path.endsWith('/resolved')
+        ? 'resolved'
+        : 'all';
+
+  const visibleTickets = tickets.filter((ticket) => {
+    const status = (ticket.status || '').toLowerCase();
+    if (activeView === 'open') return !['resolved', 'closed', 'auto_resolved'].includes(status);
+    if (activeView === 'resolved') return ['resolved', 'closed', 'auto_resolved'].includes(status);
+    return true;
+  });
+
+  const viewLabel = activeView === 'open' ? 'Open Tickets' : activeView === 'resolved' ? 'Resolved Tickets' : 'All Tickets';
+  const viewDescription =
+    activeView === 'open'
+      ? 'Showing only active tickets that still need action.'
+      : activeView === 'resolved'
+        ? 'Showing only resolved or closed ticket history.'
+        : "Here's what's happening with your support requests today.";
+
+  const ticketMix = {
+    open: tickets.filter((ticket) => ['new', 'open', 'assigned', 'in_progress', 'pending'].includes(ticket.status)).length,
+    resolved: tickets.filter((ticket) => ['resolved', 'closed', 'auto_resolved'].includes(ticket.status)).length,
+    highPriority: tickets.filter((ticket) => ['critical', 'high'].includes(ticket.priority)).length,
+  };
+
+  const topCategories = Object.entries(
+    tickets.reduce((acc, ticket) => {
+      const key = ticket.category || 'Uncategorized';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+
   return (
     <AdminLayout title="Dashboard">
       <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Welcome back, {user?.full_name?.split(' ')[0] || 'User'}</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Here's what's happening with your support requests today.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">{viewDescription}</p>
+          <div className="mt-3 inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+            <span className="material-symbols-outlined text-[14px]">dashboard</span>
+            {viewLabel}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -151,23 +193,15 @@ const EmployeeDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Priority</label>
-                    <select className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 py-2.5 px-4"
-                      value={priority} onChange={(e) => setPriority(e.target.value)}>
-                      <option value="low">Low - General Question</option>
-                      <option value="medium">Medium - Affects Productivity</option>
-                      <option value="high">High - System Down</option>
-                      <option value="critical">Critical - Business Impact</option>
-                    </select>
+                    <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 py-2.5 px-4 text-sm">
+                      Auto-assigned by AI
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
-                    <select className="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 py-2.5 px-4"
-                      value={department} onChange={(e) => setDepartment(e.target.value)}>
-                      <option>IT Support</option>
-                      <option>HR</option>
-                      <option>Facilities</option>
-                      <option>Legal</option>
-                    </select>
+                    <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 py-2.5 px-4 text-sm">
+                      Auto-classified by AI
+                    </div>
                   </div>
                 </div>
                 <div className="pt-2 flex items-center justify-between">
@@ -222,19 +256,56 @@ const EmployeeDashboard = () => {
           <div className="lg:col-span-5 flex flex-col h-full">
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col h-full max-h-[700px]">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Recent Activity</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">{viewLabel}</h2>
+                <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">{visibleTickets.length} shown</span>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {loading ? (
                   <div className="flex items-center justify-center py-12 text-slate-400"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span> Loading...</div>
-                ) : tickets.length === 0 ? (
+                ) : visibleTickets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                     <span className="material-symbols-outlined text-4xl mb-2">inbox</span>
                     <p className="text-sm">No tickets yet. Submit your first one!</p>
                   </div>
-                ) : tickets.slice(0, 8).map((ticket) => (
-                  <Link to={`/tickets/${ticket.id}`} key={ticket.id}
-                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors cursor-pointer group border border-transparent hover:border-slate-200 dark:hover:border-slate-700 block">
+                ) : visibleTickets.slice(0, 8).map((ticket) => {
+                  const ticketIdentifier = ticket.id || ticket.ticket_id;
+                  const cardClasses = `p-4 rounded-lg transition-colors group border block ${
+                    ticketIdentifier
+                      ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border-transparent hover:border-slate-200 dark:hover:border-slate-700'
+                      : 'opacity-70 cursor-not-allowed border-slate-100 dark:border-slate-800'
+                  }`;
+
+                  if (!ticketIdentifier) {
+                    return (
+                      <div key={`${ticket.ticket_number || ticket.title}-missing-id`} className={cardClasses}>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-slate-400">{ticket.ticket_number}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusBadge(ticket.status)}`}>
+                              {ticket.status?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-400">{timeAgo(ticket.created_at)}</span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">{ticket.title}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          {ticket.priority && (
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                              ticket.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                              ticket.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                              ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>{ticket.priority}</span>
+                          )}
+                          {ticket.category && <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{ticket.category}</span>}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                  <Link to={`/tickets/${ticketIdentifier}`} key={ticketIdentifier}
+                    className={cardClasses}>
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-slate-400">{ticket.ticket_number}</span>
@@ -257,12 +328,82 @@ const EmployeeDashboard = () => {
                       {ticket.category && <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{ticket.category}</span>}
                     </div>
                   </Link>
-                ))}
+                );})}
               </div>
               <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 rounded-b-xl">
                 <div className="flex items-center gap-3 text-sm text-slate-500">
                   <span className="material-symbols-outlined text-[20px] text-orange-500">lightbulb</span>
                   <p>Click any ticket to view details and conversation.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-6">
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-5">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">My Ticket Health</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: 'Open / Active', value: ticketMix.open, color: 'bg-blue-500' },
+                    { label: 'Resolved / Closed', value: ticketMix.resolved, color: 'bg-emerald-500' },
+                    { label: 'High Priority', value: ticketMix.highPriority, color: 'bg-orange-500' },
+                  ].map((item) => {
+                    const totalCount = Math.max(1, tickets.length);
+                    const width = (item.value / totalCount) * 100;
+                    return (
+                      <div key={item.label}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-slate-600 dark:text-slate-300">{item.label}</span>
+                          <span className="font-semibold text-slate-800 dark:text-white">{item.value}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700">
+                          <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${width}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Top Categories</p>
+                  {topCategories.length === 0 ? (
+                    <p className="text-sm text-slate-500">No ticket categories yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {topCategories.map(([name, count]) => (
+                        <div key={name} className="flex items-center justify-between text-sm">
+                          <span className="text-slate-700 dark:text-slate-300 truncate">{name}</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-5">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Quick Actions</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    onClick={() => document.getElementById('ticket-title')?.focus()}
+                    className="text-left rounded-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Create Ticket</p>
+                    <p className="text-xs text-slate-500 mt-1">Jump to form and submit quickly.</p>
+                  </button>
+                  <Link
+                    to="/staff/tickets"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Track Queue</p>
+                    <p className="text-xs text-slate-500 mt-1">Open full ticket tracking view.</p>
+                  </Link>
+                  <button
+                    onClick={() => setChatOpen(true)}
+                    className="text-left rounded-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Ask AI Assistant</p>
+                    <p className="text-xs text-slate-500 mt-1">Get guidance or auto-create tickets.</p>
+                  </button>
                 </div>
               </div>
             </div>

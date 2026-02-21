@@ -5,10 +5,12 @@ import httpx
 from typing import Any, Dict, Optional
 import logging
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
-AI_SERVICE_URL = "http://localhost:8001"
-AI_SERVICE_TIMEOUT = 30.0
+AI_SERVICE_URL = settings.AI_SERVICE_URL
+AI_SERVICE_TIMEOUT = settings.AI_SERVICE_TIMEOUT
 
 
 class AIServiceClient:
@@ -40,7 +42,9 @@ class AIServiceClient:
         self,
         subject: str,
         description: str,
-        tenant_id: Optional[str] = None
+        tenant_id: Optional[str] = None,
+        allowed_categories: Optional[list[str]] = None,
+        category_team_map: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
         Send ticket to AI service for analysis
@@ -72,6 +76,10 @@ class AIServiceClient:
             }
             if tenant_id:
                 payload["tenant_id"] = tenant_id
+            if allowed_categories is not None:
+                payload["allowed_categories"] = allowed_categories
+            if category_team_map is not None:
+                payload["category_team_map"] = category_team_map
 
             logger.info(f"Sending ticket to AI service: {subject[:50]}...")
 
@@ -117,7 +125,9 @@ def get_ai_client() -> AIServiceClient:
 async def analyze_ticket_with_ai(
     subject: str,
     description: str,
-    company_id: Optional[str] = None
+    company_id: Optional[str] = None,
+    allowed_categories: Optional[list[str]] = None,
+    category_team_map: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to analyze ticket with AI
@@ -131,4 +141,10 @@ async def analyze_ticket_with_ai(
         AI analysis result dictionary
     """
     client = get_ai_client()
-    return await client.analyze_ticket(subject, description, tenant_id=company_id)
+    return await client.analyze_ticket(
+        subject,
+        description,
+        tenant_id=company_id,
+        allowed_categories=allowed_categories,
+        category_team_map=category_team_map,
+    )

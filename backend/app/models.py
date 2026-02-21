@@ -120,6 +120,16 @@ class User(Base):
     )  # online, away, offline
     department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    google_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    google_access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_token_scope: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_token_expiry: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    google_connected_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -192,6 +202,50 @@ class CompanyTeamMapping(Base):
 
     __table_args__ = (
         UniqueConstraint("company_id", "category", name="uq_mapping_company_category"),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Company Issues (company_admin ↔ super_admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CompanyIssue(Base):
+    __tablename__ = "company_issues"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="open")
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CompanyIssueMessage(Base):
+    __tablename__ = "company_issue_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    issue_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("company_issues.id", ondelete="CASCADE"), nullable=False
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )
 
 
