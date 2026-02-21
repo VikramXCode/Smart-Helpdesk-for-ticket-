@@ -9,14 +9,16 @@ Creates the FastAPI app with:
 - Optional Sentry integration
 """
 from contextlib import asynccontextmanager
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.dependencies import engine
+from app.dependencies import AsyncSessionLocal, engine
 from app.models import Base
 from app.routes import auth, tickets, chat, analytics, admin, super_admin, webhooks, knowledge, issues
+from app.services.imap_poller import run_imap_poller
 from app.utils.exceptions import register_exception_handlers
 
 
@@ -31,9 +33,18 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    poller_stop_event = asyncio.Event()
+    poller_task = None
+    if settings.IMAP_POLLER_ENABLED:
+        poller_task = asyncio.create_task(run_imap_poller(poller_stop_event, AsyncSessionLocal))
+
     yield
 
     # Shutdown
+    if poller_task:
+        poller_stop_event.set()
+        await poller_task
+
     await engine.dispose()
 
 

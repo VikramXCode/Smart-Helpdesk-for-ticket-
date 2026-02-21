@@ -51,6 +51,17 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/gmail.send"
     )
 
+    # ── IMAP Email Poller (no webhooks) ───────────────────────────────────
+    IMAP_POLLER_ENABLED: bool = False
+    IMAP_HOST: Optional[str] = None
+    IMAP_PORT: int = 993
+    IMAP_USERNAME: Optional[str] = None
+    IMAP_APP_PASSWORD: Optional[str] = None
+    IMAP_MAILBOX: str = "INBOX"
+    IMAP_USE_SSL: bool = True
+    IMAP_POLL_INTERVAL_SECONDS: int = 30
+    IMAP_COMPANY_ADMIN_EMAIL: Optional[str] = None
+
     # ── Monitoring ────────────────────────────────────────────────────────────
     SENTRY_DSN: Optional[str] = None
 
