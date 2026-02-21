@@ -21,6 +21,17 @@ import structlog
 from app.config import settings
 
 logger = structlog.get_logger(__name__)
+_GROQ_TEMP_DISABLED = False
+
+
+def _can_use_groq() -> bool:
+    return settings.use_real_ai and bool(settings.GROQ_API_KEY) and not _GROQ_TEMP_DISABLED
+
+
+def _disable_groq_for_runtime(reason: str) -> None:
+    global _GROQ_TEMP_DISABLED
+    _GROQ_TEMP_DISABLED = True
+    logger.error("groq_temporarily_disabled", reason=reason)
 
 # Global categories used for classification prompts
 GLOBAL_CATEGORIES = [
@@ -148,7 +159,7 @@ async def classify_ticket(title: str, description: str) -> str:
     Classify a ticket into one of GLOBAL_CATEGORIES using Groq LLM.
     Falls back to keyword-based mock if GROQ_API_KEY is not set.
     """
-    if not settings.GROQ_API_KEY:
+    if not _can_use_groq():
         logger.info("groq_api_key_missing", action="using_mock_classification")
         return _mock_category(title, description)
 
@@ -192,6 +203,11 @@ async def classify_ticket(title: str, description: str) -> str:
                     return cat
             logger.warning("groq_unknown_category", returned=category)
             return _mock_category(title, description)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (401, 403):
+            _disable_groq_for_runtime("unauthorized_or_forbidden")
+        logger.error("groq_classification_failed", error=str(e), status_code=e.response.status_code)
+        return _mock_category(title, description)
     except Exception as e:
         logger.error("groq_classification_failed", error=str(e))
         return _mock_category(title, description)
@@ -206,7 +222,7 @@ async def classify_ticket_to_allowed_category(
     if not allowed_categories:
         return None
 
-    if settings.GROQ_API_KEY:
+    if _can_use_groq():
         categories_str = "\n".join(f"- {c}" for c in allowed_categories)
         prompt = (
             "You are an IT helpdesk routing engine. "
@@ -242,6 +258,10 @@ async def classify_ticket_to_allowed_category(
                 mapped = map_to_allowed_category(category, allowed_categories)
                 if mapped:
                     return mapped
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (401, 403):
+                _disable_groq_for_runtime("unauthorized_or_forbidden")
+            logger.error("groq_allowed_category_classification_failed", error=str(e), status_code=e.response.status_code)
         except Exception as e:
             logger.error("groq_allowed_category_classification_failed", error=str(e))
 
@@ -262,7 +282,7 @@ async def chat_with_ai(
     Chat with the Groq LLM for general IT helpdesk queries.
     Falls back to a canned response if API key not set.
     """
-    if not settings.GROQ_API_KEY:
+    if not _can_use_groq():
         return (
             "I'm your AI assistant. I can help you troubleshoot IT issues, "
             "find knowledge base articles, or create support tickets. "
@@ -301,6 +321,11 @@ async def chat_with_ai(
             response.raise_for_status()
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (401, 403):
+            _disable_groq_for_runtime("unauthorized_or_forbidden")
+        logger.error("groq_chat_failed", error=str(e), status_code=e.response.status_code)
+        return "I'm currently running in fallback mode due to AI auth configuration. I can still help and create a ticket for you."
     except Exception as e:
         logger.error("groq_chat_failed", error=str(e))
         return "I'm having trouble connecting right now. Please try again or create a support ticket for urgent issues."
@@ -320,7 +345,7 @@ async def generate_ticket_suggestion(
     Generate an AI suggestion/insight for a ticket.
     Returns (suggestion_text, confidence_percentage).
     """
-    if not settings.GROQ_API_KEY:
+    if not _can_use_groq():
         confidence = 75
         similar_str = ""
         if similar_titles:
@@ -371,6 +396,11 @@ async def generate_ticket_suggestion(
                 except ValueError:
                     pass
             return insight, confidence
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (401, 403):
+            _disable_groq_for_runtime("unauthorized_or_forbidden")
+        logger.error("groq_suggestion_failed", error=str(e), status_code=e.response.status_code)
+        return "AI analysis unavailable. Please review the ticket manually.", 0
     except Exception as e:
         logger.error("groq_suggestion_failed", error=str(e))
         return "AI analysis unavailable. Please review the ticket manually.", 0
@@ -385,7 +415,7 @@ async def summarize_trend_cluster(ticket_titles: List[str]) -> str:
     Summarize a cluster of related tickets using Groq.
     Falls back to a template if API key not set.
     """
-    if not settings.GROQ_API_KEY or not ticket_titles:
+    if not _can_use_groq() or not ticket_titles:
         return f"Cluster of {len(ticket_titles)} related tickets detected. Common theme: {ticket_titles[0] if ticket_titles else 'Unknown'}."
 
     titles_str = "\n".join(f"- {t}" for t in ticket_titles[:20])
@@ -408,6 +438,11 @@ async def summarize_trend_cluster(ticket_titles: List[str]) -> str:
             )
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"].strip()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (401, 403):
+            _disable_groq_for_runtime("unauthorized_or_forbidden")
+        logger.error("groq_summarize_failed", error=str(e), status_code=e.response.status_code)
+        return f"Multiple related tickets detected: {ticket_titles[0]}."
     except Exception as e:
         logger.error("groq_summarize_failed", error=str(e))
         return f"Multiple related tickets detected: {ticket_titles[0]}."
@@ -422,7 +457,7 @@ async def generate_embedding(text: str) -> List[float]:
     Generate a 768-dim embedding vector using Jina AI.
     Falls back to a deterministic mock vector if JINA_API_KEY is not set.
     """
-    if not settings.JINA_API_KEY:
+    if not settings.use_real_ai or not settings.JINA_API_KEY:
         logger.info("jina_api_key_missing", action="using_mock_embedding")
         return _mock_embedding(text)
 

@@ -29,7 +29,7 @@ export const AdminLayout = ({ children, title, headerAction }) => {
       : 'Dashboard';
 
   const showTicketsLink = isCompanyAdmin;
-  const showKnowledgeLink = false;
+  const showKnowledgeLink = isEmployee;
 
   const handleLogout = () => {
     logout();

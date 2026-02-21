@@ -29,12 +29,12 @@ async def send_email(
     if not to:
         return False
 
-    if not settings.RESEND_API_KEY:
+    if settings.use_mock_notifications or not settings.RESEND_API_KEY:
         logger.info(
             "email_mock_sent",
             to=to,
             subject=subject,
-            note="Set RESEND_API_KEY to send real emails",
+            note="Mock mode enabled or RESEND_API_KEY not set",
         )
         return True
 
@@ -72,12 +72,12 @@ async def send_sms(to: List[str], body: str) -> bool:
     if not to:
         return False
 
-    if not all([settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN, settings.TWILIO_PHONE_NUMBER]):
+    if settings.use_mock_notifications or not all([settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN, settings.TWILIO_PHONE_NUMBER]):
         logger.info(
             "sms_mock_sent",
             to=to,
             body=body[:50],
-            note="Set TWILIO_* env vars to send real SMS",
+            note="Mock mode enabled or TWILIO_* env vars not fully set",
         )
         return True
 
@@ -217,5 +217,71 @@ async def notify_ticket_routed(
     await send_email(
         [reporter_email],
         f"[{ticket_number}] Ticket routed to {team_display}",
+        html,
+    )
+
+
+async def notify_ticket_status_changed(
+    ticket_number: str,
+    ticket_title: str,
+    reporter_email: Optional[str],
+    old_status: Optional[str],
+    new_status: str,
+    actor_name: str,
+    frontend_url: str,
+) -> None:
+    """Notify reporter when ticket status changes."""
+    if not reporter_email:
+        return
+
+    ticket_url = f"{frontend_url}/tickets/{ticket_number}"
+    old_label = (old_status or "unknown").replace("_", " ").title()
+    new_label = new_status.replace("_", " ").title()
+
+    html = f"""
+    <h2>Ticket Status Updated</h2>
+    <p><strong>Ticket:</strong> {ticket_number}</p>
+    <p><strong>Title:</strong> {ticket_title}</p>
+    <p><strong>Updated by:</strong> {actor_name}</p>
+    <p><strong>Status:</strong> {old_label} → {new_label}</p>
+    <p><a href=\"{ticket_url}\">View Ticket →</a></p>
+    """
+
+    await send_email(
+        [reporter_email],
+        f"[{ticket_number}] Status changed to {new_label}",
+        html,
+    )
+
+
+async def notify_ticket_agent_reply(
+    ticket_number: str,
+    ticket_title: str,
+    reporter_email: Optional[str],
+    agent_name: str,
+    message_content: str,
+    frontend_url: str,
+) -> None:
+    """Notify reporter when an IT agent replies in ticket conversation."""
+    if not reporter_email:
+        return
+
+    ticket_url = f"{frontend_url}/tickets/{ticket_number}"
+    preview = (message_content or "").strip()
+    if len(preview) > 220:
+        preview = preview[:220] + "..."
+
+    html = f"""
+    <h2>New Reply on Your Ticket</h2>
+    <p><strong>Ticket:</strong> {ticket_number}</p>
+    <p><strong>Title:</strong> {ticket_title}</p>
+    <p><strong>From:</strong> {agent_name}</p>
+    <p><strong>Message:</strong> {preview}</p>
+    <p><a href=\"{ticket_url}\">View Conversation →</a></p>
+    """
+
+    await send_email(
+        [reporter_email],
+        f"[{ticket_number}] New response from support",
         html,
     )

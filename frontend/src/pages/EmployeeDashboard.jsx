@@ -78,7 +78,11 @@ const EmployeeDashboard = () => {
         message: userMsg,
         conversation_history: chatHistory.map(m => ({ role: m.role, content: m.content })),
       });
-      setChatHistory(prev => [...prev, { role: 'assistant', content: res.data.response }]);
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: res.data.response,
+        articles: Array.isArray(res.data.suggested_articles) ? res.data.suggested_articles : [],
+      }]);
       if (res.data.ticket_created) {
         toast.success('AI created a ticket for you!');
         loadData();
@@ -169,6 +173,7 @@ const EmployeeDashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Submit ticket form */}
           <div className="lg:col-span-7 flex flex-col gap-6">
+            {activeView === 'all' ? (
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -217,6 +222,35 @@ const EmployeeDashboard = () => {
                 </div>
               </form>
             </div>
+            ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">{activeView === 'open' ? 'Open Ticket Queue' : 'Resolved Ticket Archive'}</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {activeView === 'open'
+                      ? 'Track active requests that still need action.'
+                      : 'Review closed and resolved support history.'}
+                  </p>
+                </div>
+                <span className="material-symbols-outlined text-blue-500">insights</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 border border-slate-100 dark:border-slate-700">
+                  <p className="text-xs text-slate-500">Visible Tickets</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-white">{visibleTickets.length}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 border border-slate-100 dark:border-slate-700">
+                  <p className="text-xs text-slate-500">High Priority</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-white">{ticketMix.highPriority}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 border border-slate-100 dark:border-slate-700">
+                  <p className="text-xs text-slate-500">Need New Ticket?</p>
+                  <Link to="/dashboard" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Go to Dashboard</Link>
+                </div>
+              </div>
+            </div>
+            )}
 
             {/* Stat cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -433,9 +467,21 @@ const EmployeeDashboard = () => {
               )}
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                  <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                     msg.role === 'user' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
-                  }`}>{msg.content}</div>
+                  }`}>
+                    <div>{msg.content}</div>
+                    {msg.role === 'assistant' && Array.isArray(msg.articles) && msg.articles.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.articles.map((article) => (
+                          <div key={article.id} className="rounded-lg border border-slate-200 dark:border-slate-600 p-2 bg-white/80 dark:bg-slate-800/60">
+                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{article.title}</div>
+                            <div className="text-[11px] text-slate-500 truncate">{article.summary}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
               {chatLoading && <div className="flex justify-start"><div className="bg-slate-100 dark:bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-500 animate-pulse">Thinking...</div></div>}

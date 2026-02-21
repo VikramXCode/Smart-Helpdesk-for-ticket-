@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getTicket, addMessage, updateTicket, resolveTicket, getAiSuggestion, getSimilarArticles } from '../api/tickets';
+import { getTicket, addMessage, updateTicket, resolveTicket } from '../api/tickets';
 import toast from 'react-hot-toast';
 
 const TicketDetailView = () => {
@@ -13,8 +13,6 @@ const TicketDetailView = () => {
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState(null);
-  const [similarArticles, setSimilarArticles] = useState([]);
   const [status, setStatus] = useState('');
 
   useEffect(() => {
@@ -29,14 +27,6 @@ const TicketDetailView = () => {
       setTicket(t);
       setMessages(t.messages || []);
       setStatus(t.status);
-
-      // Load AI suggestion and similar articles in parallel
-      const [aiRes, artRes] = await Promise.all([
-        getAiSuggestion(ticketId).catch(() => null),
-        getSimilarArticles(ticketId).catch(() => null),
-      ]);
-      if (aiRes?.data) setAiSuggestion(aiRes.data);
-      if (artRes?.data) setSimilarArticles(artRes.data);
     } catch (err) {
       toast.error('Failed to load ticket');
       navigate(-1);
@@ -116,6 +106,7 @@ const TicketDetailView = () => {
   if (!ticket) return null;
 
   const isStaff = ['it_staff', 'company_admin', 'super_admin'].includes(user?.role);
+  const techSupportName = ticket.assignee?.name || ticket.assigned_to_name || 'Unassigned';
 
   return (
     <div className="w-full min-h-screen bg-background-light dark:bg-slate-900">
@@ -281,12 +272,10 @@ const TicketDetailView = () => {
                     <span className="font-medium text-slate-900 dark:text-white">{ticket.assigned_team}</span>
                   </div>
                 )}
-                {ticket.assigned_to_name && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Assigned To</span>
-                    <span className="font-medium text-slate-900 dark:text-white">{ticket.assigned_to_name}</span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tech Support</span>
+                  <span className="font-medium text-slate-900 dark:text-white">{techSupportName}</span>
+                </div>
                 {ticket.due_date && (
                   <div className="flex justify-between">
                     <span className="text-slate-500">Due Date</span>
@@ -301,52 +290,6 @@ const TicketDetailView = () => {
                 )}
               </div>
             </div>
-
-            {/* People */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">People</h3>
-              <div className="space-y-3">
-                {ticket.created_by_name && (
-                  <div className="flex items-center gap-3">
-                    <div className="size-8 rounded-full bg-slate-400 text-white flex items-center justify-center text-xs font-bold">{ticket.created_by_name.charAt(0)}</div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{ticket.created_by_name}</p>
-                      <p className="text-xs text-slate-500">Reporter</p>
-                    </div>
-                  </div>
-                )}
-                {ticket.assigned_to_name && (
-                  <div className="flex items-center gap-3">
-                    <div className="size-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">{ticket.assigned_to_name.charAt(0)}</div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{ticket.assigned_to_name}</p>
-                      <p className="text-xs text-slate-500">Assignee</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* AI Suggestion */}
-            {(aiSuggestion?.text || ticket.ai_suggestion) && (
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="material-symbols-outlined text-blue-600">auto_awesome</span>
-                  <h3 className="text-base font-bold text-blue-900 dark:text-blue-200">AI Suggestion</h3>
-                </div>
-                <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
-                  {aiSuggestion?.text || ticket.ai_suggestion}
-                </p>
-                {aiSuggestion?.confidence != null && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex-1 bg-blue-200 dark:bg-blue-800 rounded-full h-1.5">
-                      <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${aiSuggestion.confidence * 100}%` }}></div>
-                    </div>
-                    <span className="text-xs text-blue-600 font-medium">{Math.round(aiSuggestion.confidence * 100)}% confidence</span>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* End of sections */}
           </div>

@@ -69,6 +69,24 @@ class AIServiceClient:
         Raises:
             Exception: If AI service is unavailable or returns error
         """
+        if settings.mock_mode:
+            selected_category = (allowed_categories[0] if allowed_categories else "General")
+            selected_team = None
+            if category_team_map:
+                selected_team = category_team_map.get(selected_category)
+            return {
+                "success": True,
+                "ai_response": "Mock mode enabled. Ticket has been routed based on configured team mappings.",
+                "confidence": 0.75,
+                "category": selected_category,
+                "priority": "medium",
+                "assigned_team": selected_team,
+                "is_duplicate": False,
+                "similar_tickets": [],
+                "should_resolve": False,
+                "full_analysis": {"mode": "mock"},
+            }
+
         try:
             payload = {
                 "subject": subject,

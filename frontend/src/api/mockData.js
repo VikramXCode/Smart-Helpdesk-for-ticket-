@@ -6,22 +6,22 @@ const hoursAgo = (h) => new Date(now.getTime() - h * 60 * 60 * 1000).toISOString
 const mockUsers = {
   employee: {
     id: 'u-emp-1',
-    full_name: 'Alex Employee',
-    email: 'employee@demo.com',
+    full_name: 'Employee User',
+    email: 'employee@gmail.com',
     role: 'employee',
     company_id: 'c-1',
   },
   it_staff: {
     id: 'u-staff-1',
-    full_name: 'Taylor IT',
-    email: 'itstaff@demo.com',
+    full_name: 'Raja',
+    email: 'raja@gmail.com',
     role: 'it_staff',
     company_id: 'c-1',
   },
   company_admin: {
     id: 'u-admin-1',
-    full_name: 'Jordan Admin',
-    email: 'admin@demo.com',
+    full_name: 'Company Admin',
+    email: 'cpadmin@gmail.com',
     role: 'company_admin',
     company_id: 'c-1',
   },

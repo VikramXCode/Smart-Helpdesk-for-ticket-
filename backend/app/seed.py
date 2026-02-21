@@ -1,8 +1,7 @@
 """
 seed.py – Standalone async database seed script.
 
-Seeds only core login accounts (4 roles).
-No demo/mock tickets, articles, or analytics data are inserted.
+Seeds core login accounts and a small demo ticket set.
 
 Run with:
     cd backend
@@ -20,6 +19,8 @@ from app.models import (
     CompanyTeamMapping,
     Company,
     Team,
+    Ticket,
+    TicketMessage,
     User,
 )
 
@@ -53,6 +54,10 @@ async def seed():
             "ava.admin@novaworks.com",
             "liam.staff@novaworks.com",
             "mia.employee@novaworks.com",
+            "cpadmin@gmail.com",
+            "raja@gmail.com",
+            "employee@gmail.com",
+            "software.agent@gmail.com",
         ]
 
         # Remove previous seed users (old and new) so reseed is deterministic.
@@ -155,43 +160,121 @@ async def seed():
         # Company-scoped role accounts
         company_admin_user = User(
             company_id=company.id,
-            email="ava.admin@novaworks.com",
-            hashed_password=h("12345678"),
-            full_name="Ava Martinez",
+            email="cpadmin@gmail.com",
+            hashed_password=h("123456789"),
+            full_name="Company Admin",
             role="company_admin",
             status="online",
             department="IT",
         )
         it_staff_user = User(
             company_id=company.id,
-            email="liam.staff@novaworks.com",
-            hashed_password=h("ItStaff@123"),
-            full_name="Liam Carter",
+            email="raja@gmail.com",
+            hashed_password=h("123456789"),
+            full_name="Raja",
             role="it_staff",
             status="online",
             department="Network",
             team_id=teams_by_name["Network"].id,
         )
+        software_it_staff_user = User(
+            company_id=company.id,
+            email="software.agent@gmail.com",
+            hashed_password=h("123456789"),
+            full_name="Priya",
+            role="it_staff",
+            status="online",
+            department="Software",
+            team_id=teams_by_name["Software"].id,
+        )
         employee_user = User(
             company_id=company.id,
-            email="mia.employee@novaworks.com",
-            hashed_password=h("Employee@123"),
-            full_name="Mia Reynolds",
+            email="employee@gmail.com",
+            hashed_password=h("12345678"),
+            full_name="Employee User",
             role="employee",
             status="online",
             department="Operations",
         )
 
-        for user in [company_admin_user, it_staff_user, employee_user]:
+        for user in [company_admin_user, it_staff_user, software_it_staff_user, employee_user]:
             db.add(user)
+
+        await db.flush()
+
+        demo_ticket_titles = [
+            "[DEMO] Password reset auto-resolved",
+            "[DEMO] Software install issue",
+        ]
+        await db.execute(delete(Ticket).where(Ticket.title.in_(demo_ticket_titles)))
+        await db.flush()
+
+        auto_resolved_ticket = Ticket(
+            company_id=company.id,
+            ticket_number="INC-90001",
+            title="[DEMO] Password reset auto-resolved",
+            description="Forgot password and account locked. AI provided self-service recovery steps.",
+            status="auto_resolved",
+            category="Software",
+            priority="medium",
+            assigned_team=None,
+            assigned_to=None,
+            created_by=employee_user.id,
+            source="chat",
+            department="Operations",
+            ai_response=(
+                "AI Auto-Reply: Please use self-service password reset, unlock via MFA recovery, "
+                "then sign in again after 2-3 minutes. Reply if issue persists."
+            ),
+            ai_confidence=0.95,
+            ai_predicted_category="Software",
+            ai_suggested_priority="medium",
+            is_ai_duplicate=False,
+        )
+
+        software_routed_ticket = Ticket(
+            company_id=company.id,
+            ticket_number="INC-90002",
+            title="[DEMO] Software install issue",
+            description="Unable to install accounting client after latest OS patch.",
+            status="assigned",
+            category="Software",
+            priority="high",
+            assigned_team="Software",
+            assigned_to=software_it_staff_user.id,
+            created_by=employee_user.id,
+            source="web",
+            department="Operations",
+            ai_response="AI suggested checking package compatibility and reinstalling dependencies.",
+            ai_confidence=0.86,
+            ai_predicted_category="Software",
+            ai_suggested_priority="high",
+            is_ai_duplicate=False,
+        )
+
+        db.add(auto_resolved_ticket)
+        db.add(software_routed_ticket)
+        await db.flush()
+
+        db.add(TicketMessage(
+            ticket_id=auto_resolved_ticket.id,
+            author_id=None,
+            author_type="ai",
+            content=auto_resolved_ticket.ai_response,
+            is_internal=False,
+        ))
 
         await db.commit()
         print("✅ Seed complete! Users:")
         print("   platform.super@helpdesk.ai / SuperAdmin@123   (super_admin)")
-        print("   ava.admin@novaworks.com    / 12345678         (company_admin, must change on first login)")
-        print("   liam.staff@novaworks.com   / ItStaff@123      (it_staff)")
-        print("   mia.employee@novaworks.com / Employee@123     (employee)")
+        print("   cpadmin@gmail.com          / 123456789        (company_admin)")
+        print("   raja@gmail.com             / 123456789        (it_staff)")
+        print("   software.agent@gmail.com   / 123456789        (it_staff - Software)")
+        print("   employee@gmail.com         / 12345678         (employee)")
         print("✅ Category routing defaults seeded: Network, Access, Software, Hardware, Infrastructure")
+        print("✅ Demo tickets seeded:")
+        print("   INC-90001 [DEMO] Password reset auto-resolved (AI reply, no routing)")
+        print("   INC-90002 [DEMO] Software install issue (routed to Software team)")
 
     await engine.dispose()
 

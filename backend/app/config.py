@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"
     USE_MOCK_DATA: bool = False
+    PREFER_REAL_APIS: bool = True
+    FORCE_MOCK_AI: bool = False
+    FORCE_MOCK_NOTIFICATIONS: bool = False
 
     # ── Trend Detection ───────────────────────────────────────────────────────
     TREND_MIN_CLUSTER_SIZE: int = 3
@@ -77,6 +80,18 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+
+    @property
+    def mock_mode(self) -> bool:
+        return self.USE_MOCK_DATA
+
+    @property
+    def use_real_ai(self) -> bool:
+        return (not self.mock_mode) and self.PREFER_REAL_APIS and (not self.FORCE_MOCK_AI)
+
+    @property
+    def use_mock_notifications(self) -> bool:
+        return self.mock_mode or self.FORCE_MOCK_NOTIFICATIONS
 
 
 settings = Settings()

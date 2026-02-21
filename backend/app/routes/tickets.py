@@ -41,7 +41,11 @@ from app.schemas import (
 )
 from app.services import ai
 from app.services.ai_client import analyze_ticket_with_ai
-from app.services.notifications import notify_ticket_routed
+from app.services.notifications import (
+    notify_ticket_agent_reply,
+    notify_ticket_routed,
+    notify_ticket_status_changed,
+)
 from app.services.vector import find_similar_articles
 from app.utils.exceptions import ForbiddenError, NotFoundError
 from app.config import settings
@@ -50,6 +54,22 @@ router = APIRouter(prefix="/tickets", tags=["tickets"])
 logger = logging.getLogger(__name__)
 FALLBACK_CATEGORY = "Others"
 FALLBACK_TEAM = "Others"
+
+
+def _is_self_service_issue(title: str, description: str) -> bool:
+    text = f"{title} {description}".lower()
+    return any(
+        keyword in text
+        for keyword in [
+            "password reset",
+            "reset password",
+            "forgot password",
+            "vpn reconnect",
+            "vpn not connecting",
+            "locked account",
+            "mfa reset",
+        ]
+    )
 
 
 def _relative_time(dt: Optional[datetime]) -> str:
@@ -208,6 +228,8 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
     ai_assigned_team = None
     is_duplicate = False
 
+    is_self_service = _is_self_service_issue(payload.title, payload.description)
+
     # Build tenant-scoped category/team constraints from team names only
     team_result = await db.execute(
         select(Team).where(Team.company_id == current_user.company_id)
@@ -272,11 +294,26 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
             ai_cat = FALLBACK_CATEGORY
         ai_assigned_team = category_team_map.get(ai_cat, category_team_map.get(FALLBACK_CATEGORY, FALLBACK_TEAM))
 
+    if is_self_service:
+        if not ai_response_text:
+            ai_response_text = (
+                "I can help with this immediately. Please try: (1) sign out of all sessions, "
+                "(2) reset credentials using the company self-service page, and "
+                "(3) sign in again after 2-3 minutes. "
+                "If this does not work, reply to this ticket and IT will assist."
+            )
+        if not ai_cat:
+            ai_cat = "Software"
+        initial_status = "auto_resolved"
+        ai_assigned_team = None
+
     # Create ticket with AI data
     final_priority = ai_priority or payload.priority
     final_department = payload.department or ai_assigned_team
     auto_assignee = await _pick_assignee_for_team(db, current_user.company_id, ai_assigned_team)
     assigned_to_id = auto_assignee.id if auto_assignee else None
+    if initial_status == "auto_resolved":
+        assigned_to_id = None
     if assigned_to_id and initial_status == "new":
         initial_status = "assigned"
 
@@ -291,7 +328,7 @@ async def create_ticket(payload: TicketCreate, current_user: CurrentUser, db: DB
         created_by=current_user.id,
         status=initial_status,
         category=ai_cat,
-        assigned_team=ai_assigned_team,
+        assigned_team=None if initial_status == "auto_resolved" else ai_assigned_team,
         assigned_to=assigned_to_id,
         # AI fields
         ai_response=ai_response_text,
@@ -596,6 +633,20 @@ async def update_ticket(
 
     await db.commit()
     await db.refresh(ticket)
+
+    if ticket.status != old_status:
+        reporter_result = await db.execute(select(User).where(User.id == ticket.created_by))
+        reporter_user = reporter_result.scalar_one_or_none()
+        await notify_ticket_status_changed(
+            ticket_number=ticket.ticket_number or str(ticket.id),
+            ticket_title=ticket.title,
+            reporter_email=reporter_user.email if reporter_user else None,
+            old_status=old_status,
+            new_status=ticket.status,
+            actor_name=current_user.full_name,
+            frontend_url=settings.FRONTEND_URL,
+        )
+
     return _build_ticket_list_item(ticket)
 
 
@@ -660,6 +711,7 @@ async def resolve_ticket(ticket_id: uuid.UUID, current_user: CurrentUser, db: DB
     if current_user.company_id and ticket.company_id != current_user.company_id:
         raise ForbiddenError()
 
+    old_status = ticket.status
     ticket.status = "resolved"
     ticket.resolved_at = datetime.now(timezone.utc)
 
@@ -672,6 +724,20 @@ async def resolve_ticket(ticket_id: uuid.UUID, current_user: CurrentUser, db: DB
 
     await db.commit()
     await db.refresh(ticket)
+
+    if old_status != "resolved":
+        reporter_result = await db.execute(select(User).where(User.id == ticket.created_by))
+        reporter_user = reporter_result.scalar_one_or_none()
+        await notify_ticket_status_changed(
+            ticket_number=ticket.ticket_number or str(ticket.id),
+            ticket_title=ticket.title,
+            reporter_email=reporter_user.email if reporter_user else None,
+            old_status=old_status,
+            new_status=ticket.status,
+            actor_name=current_user.full_name,
+            frontend_url=settings.FRONTEND_URL,
+        )
+
     return _build_ticket_list_item(ticket)
 
 
@@ -737,12 +803,37 @@ async def add_message(
     )
     db.add(msg)
 
+    status_before_reply = ticket.status
+
     # Move to in_progress when agent replies
     if author_type == "agent" and ticket.status in ("new", "assigned"):
         ticket.status = "in_progress"
 
     await db.commit()
     await db.refresh(msg)
+
+    if author_type == "agent" and not payload.is_internal:
+        reporter_result = await db.execute(select(User).where(User.id == ticket.created_by))
+        reporter_user = reporter_result.scalar_one_or_none()
+        await notify_ticket_agent_reply(
+            ticket_number=ticket.ticket_number or str(ticket.id),
+            ticket_title=ticket.title,
+            reporter_email=reporter_user.email if reporter_user else None,
+            agent_name=current_user.full_name,
+            message_content=payload.content,
+            frontend_url=settings.FRONTEND_URL,
+        )
+
+        if ticket.status != status_before_reply:
+            await notify_ticket_status_changed(
+                ticket_number=ticket.ticket_number or str(ticket.id),
+                ticket_title=ticket.title,
+                reporter_email=reporter_user.email if reporter_user else None,
+                old_status=status_before_reply,
+                new_status=ticket.status,
+                actor_name=current_user.full_name,
+                frontend_url=settings.FRONTEND_URL,
+            )
 
     author = AuthorOut(
         id=current_user.id,
